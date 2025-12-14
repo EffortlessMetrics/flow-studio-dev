@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: policy-analyst
+flows:
+  - 2, 4
+category: analytics
+color: orange
+source: project/user
+short_role: "Interpret policy docs vs change, assess policy implications."
+model: inherit

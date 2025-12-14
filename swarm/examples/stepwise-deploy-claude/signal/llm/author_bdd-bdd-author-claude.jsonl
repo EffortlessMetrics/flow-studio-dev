@@ -1,0 +1,3 @@
+{"timestamp": "2025-12-09T10:20:36.135942+00:00Z", "role": "system", "content": "Executing step author_bdd with agent bdd-author"}
+{"timestamp": "2025-12-09T10:20:36.135942+00:00Z", "role": "user", "content": "Step role: Turn verified requirements into executable BDD scenarios \u2192 features/*.feature."}
+{"timestamp": "2025-12-09T10:20:36.135969+00:00Z", "role": "assistant", "content": "[STUB] Completed step author_bdd. In production, this would contain the actual Claude response."}

@@ -1,0 +1,13 @@
+# Utility agent for swarm operations and governance
+key: swarm-ops
+
+flows:
+  - utility
+
+category: infra
+color: cyan
+source: project/user
+
+short_role: Guide for agent operations (model changes, adding agents, inspecting flows)
+
+model: inherit

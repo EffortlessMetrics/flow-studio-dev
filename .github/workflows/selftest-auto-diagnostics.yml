@@ -1,0 +1,356 @@
+# Selftest Auto-Diagnostics Workflow
+#
+# Automatically runs diagnostics when selftest governance gate fails.
+# This is Phase 1 of P4.4: Runbook Automation - GitHub Actions only,
+# no external webhooks.
+#
+# Triggers:
+# - When "Selftest Governance Gate" workflow completes with failure
+# - Manual dispatch via repository_dispatch event
+# - Manual workflow_dispatch for testing
+#
+# Outputs:
+# - Diagnostic tarball (selftest_incident_*.tar.gz)
+# - Remediation suggestions (remediation_suggestions.txt)
+# - Summary posted to PR if applicable
+#
+# See: docs/designs/RUNBOOK_AUTOMATION_DESIGN.md
+#
+# SCOPE & SAFETY:
+# - PASSIVE ONLY: Runs AFTER selftest failure, does not trigger merges
+# - NO REMEDIATION EXECUTION: Suggests commands, does not auto-execute
+# - NO EXTERNAL WEBHOOKS: GitHub Actions native only
+# - RETENTION: Artifacts auto-purge after 30 days
+
+name: Selftest Auto-Diagnostics
+
+on:
+  # Trigger when selftest governance gate completes
+  workflow_run:
+    workflows: ["Selftest Governance Gate"]
+    types: [completed]
+
+  # Allow external triggers via API
+  repository_dispatch:
+    types: [run-diagnostics]
+
+  # Manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      incident_id:
+        description: "Incident ID for tracking (optional)"
+        required: false
+        default: "manual"
+      skip_pr_comment:
+        description: "Skip posting comment to PR"
+        required: false
+        default: "false"
+        type: boolean
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  auto-diagnose:
+    name: Auto-Diagnose Selftest Failure
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Run if:
+    # - Triggered by workflow_run with failure conclusion
+    # - Triggered by repository_dispatch
+    # - Triggered manually via workflow_dispatch
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'repository_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure')
+
+    steps:
+      # ========================================
+      # Setup
+      # ========================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # For workflow_run, checkout the commit that triggered the failure
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 10  # Need recent history for diagnostics
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-diagnostics-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-diagnostics-
+            ${{ runner.os }}-uv-
+
+      - name: Install dependencies
+        run: uv sync --frozen --extra dev
+
+      # ========================================
+      # Collect Diagnostic Information
+      # ========================================
+
+      - name: Generate incident ID
+        id: incident
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            INCIDENT_ID="${{ inputs.incident_id }}"
+            if [ "$INCIDENT_ID" == "manual" ]; then
+              INCIDENT_ID="manual-$(date +%Y%m%d-%H%M%S)"
+            fi
+          elif [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            INCIDENT_ID="${{ github.event.client_payload.incident_id || format('dispatch-{0}', github.run_id) }}"
+          else
+            INCIDENT_ID="wfr-${{ github.event.workflow_run.id }}"
+          fi
+          echo "id=$INCIDENT_ID" >> $GITHUB_OUTPUT
+          echo "Generated incident ID: $INCIDENT_ID"
+
+      - name: Run incident pack
+        id: incident_pack
+        run: |
+          echo "::group::Running selftest-incident-pack"
+          make selftest-incident-pack || echo "Incident pack completed with warnings"
+
+          # Find the generated tarball
+          TARBALL=$(ls -t selftest_incident_*.tar.gz 2>/dev/null | head -1)
+          if [ -n "$TARBALL" ]; then
+            echo "tarball=$TARBALL" >> $GITHUB_OUTPUT
+            echo "Generated tarball: $TARBALL"
+          else
+            echo "tarball=" >> $GITHUB_OUTPUT
+            echo "No tarball generated"
+          fi
+          echo "::endgroup::"
+        continue-on-error: true
+
+      - name: Run suggest remediation
+        id: remediation
+        run: |
+          echo "::group::Running selftest-suggest-remediation"
+          # Run remediation suggestions, capture both stdout and exit code
+          uv run swarm/tools/selftest_suggest_remediation.py --json > remediation_suggestions.json 2>&1 || true
+
+          # Also generate human-readable version
+          uv run swarm/tools/selftest_suggest_remediation.py > remediation_suggestions.txt 2>&1 || true
+
+          # Extract summary for output
+          if [ -f remediation_suggestions.json ]; then
+            ACTIONABLE=$(jq -r '.actionable_suggestions // 0' remediation_suggestions.json)
+            UNMATCHED=$(jq -r '.unmatched // 0' remediation_suggestions.json)
+            echo "actionable=$ACTIONABLE" >> $GITHUB_OUTPUT
+            echo "unmatched=$UNMATCHED" >> $GITHUB_OUTPUT
+          else
+            echo "actionable=0" >> $GITHUB_OUTPUT
+            echo "unmatched=0" >> $GITHUB_OUTPUT
+          fi
+          echo "::endgroup::"
+        continue-on-error: true
+
+      - name: Collect git context
+        run: |
+          echo "::group::Collecting git context"
+          git log -10 --oneline > git_recent_commits.txt
+          git status > git_status.txt
+          git diff --stat HEAD~5..HEAD > git_recent_changes.txt 2>/dev/null || echo "Not enough commits" > git_recent_changes.txt
+          echo "::endgroup::"
+
+      - name: Collect environment info
+        run: |
+          echo "::group::Collecting environment info"
+          {
+            echo "=== Environment Information ==="
+            echo ""
+            echo "Python: $(python --version)"
+            echo "uv: $(uv --version)"
+            echo "OS: $(uname -a)"
+            echo ""
+            echo "Git Branch: $(git rev-parse --abbrev-ref HEAD)"
+            echo "Git Commit: $(git rev-parse HEAD)"
+            echo ""
+            echo "=== Trigger Information ==="
+            echo "Event: ${{ github.event_name }}"
+            echo "Run ID: ${{ github.run_id }}"
+            echo "Incident ID: ${{ steps.incident.outputs.id }}"
+          } > environment_info.txt
+          echo "::endgroup::"
+
+      # ========================================
+      # Upload Artifacts
+      # ========================================
+
+      - name: Upload diagnostics artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: selftest-diagnostics-${{ steps.incident.outputs.id }}
+          path: |
+            selftest_incident_*.tar.gz
+            remediation_suggestions.json
+            remediation_suggestions.txt
+            git_recent_commits.txt
+            git_status.txt
+            git_recent_changes.txt
+            environment_info.txt
+          retention-days: 30
+          if-no-files-found: warn
+
+      # ========================================
+      # Generate Summary
+      # ========================================
+
+      - name: Generate workflow summary
+        run: |
+          {
+            echo "## Selftest Auto-Diagnostics Results"
+            echo ""
+            echo "**Incident ID:** \`${{ steps.incident.outputs.id }}\`"
+            echo "**Trigger:** ${{ github.event_name }}"
+            echo "**Run ID:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            echo ""
+            echo "### Diagnostic Artifacts"
+            echo ""
+            if [ -n "${{ steps.incident_pack.outputs.tarball }}" ]; then
+              echo "- Incident pack: \`${{ steps.incident_pack.outputs.tarball }}\`"
+            else
+              echo "- Incident pack: Not generated (check logs)"
+            fi
+            echo "- Remediation suggestions: \`remediation_suggestions.json\`"
+            echo ""
+            echo "### Remediation Summary"
+            echo ""
+            echo "| Metric | Count |"
+            echo "|--------|-------|"
+            echo "| Actionable suggestions | ${{ steps.remediation.outputs.actionable }} |"
+            echo "| Unmatched degradations | ${{ steps.remediation.outputs.unmatched }} |"
+            echo ""
+            echo "### Next Steps"
+            echo ""
+            echo "1. Download the diagnostics artifact from this workflow run"
+            echo "2. Review \`remediation_suggestions.txt\` for suggested fixes"
+            echo "3. If incident pack exists, extract and review \`selftest_output.json\`"
+            echo "4. Follow runbook guidance in [docs/runbooks/](docs/runbooks/)"
+            echo ""
+            echo "---"
+            echo ""
+            echo "**Documentation:** [RUNBOOK_AUTOMATION_DESIGN.md](docs/designs/RUNBOOK_AUTOMATION_DESIGN.md)"
+          } >> $GITHUB_STEP_SUMMARY
+
+      # ========================================
+      # Post to PR (if applicable)
+      # ========================================
+
+      - name: Find associated PR
+        id: find_pr
+        if: github.event_name == 'workflow_run'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // For workflow_run events, try to find the associated PR
+            const headSha = context.payload.workflow_run?.head_sha;
+            if (!headSha) {
+              console.log('No head_sha found, skipping PR lookup');
+              return;
+            }
+
+            // Search for PRs with this head SHA
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${context.payload.workflow_run?.head_branch}`
+            });
+
+            if (prs.length > 0) {
+              const pr = prs[0];
+              console.log(`Found PR #${pr.number}: ${pr.title}`);
+              core.setOutput('pr_number', pr.number);
+              core.setOutput('found', 'true');
+            } else {
+              console.log('No associated PR found');
+              core.setOutput('found', 'false');
+            }
+
+      - name: Post diagnostics summary to PR
+        if: |
+          steps.find_pr.outputs.found == 'true' &&
+          (github.event_name != 'workflow_dispatch' || inputs.skip_pr_comment != 'true')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Read remediation suggestions if available
+            let remediationSummary = 'No remediation suggestions available';
+            let actionable = '${{ steps.remediation.outputs.actionable }}';
+            let unmatched = '${{ steps.remediation.outputs.unmatched }}';
+
+            try {
+              if (fs.existsSync('remediation_suggestions.txt')) {
+                const content = fs.readFileSync('remediation_suggestions.txt', 'utf8');
+                // Truncate if too long
+                remediationSummary = content.length > 2000
+                  ? content.substring(0, 2000) + '\n...(truncated)'
+                  : content;
+              }
+            } catch (e) {
+              console.log('Could not read remediation suggestions:', e);
+            }
+
+            const body = `## Selftest Auto-Diagnostics
+
+            **Incident ID:** \`${{ steps.incident.outputs.id }}\`
+            **Triggered by:** Selftest Governance Gate failure
+
+            ### Summary
+
+            | Metric | Count |
+            |--------|-------|
+            | Actionable suggestions | ${actionable} |
+            | Unmatched degradations | ${unmatched} |
+
+            ### Diagnostics Artifact
+
+            Download from: [Actions Run #${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            <details>
+            <summary>Remediation Suggestions Preview</summary>
+
+            \`\`\`
+            ${remediationSummary}
+            \`\`\`
+
+            </details>
+
+            ---
+
+            **Next Steps:**
+            1. Download and review diagnostics artifact
+            2. Apply suggested remediations
+            3. Re-run selftest: \`make selftest\`
+
+            *This comment was automatically generated by [selftest-auto-diagnostics](${{ github.server_url }}/${{ github.repository }}/actions/workflows/selftest-auto-diagnostics.yml)*`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.find_pr.outputs.pr_number || 0 }},
+              body: body
+            });
+
+            console.log('Posted diagnostics summary to PR #${{ steps.find_pr.outputs.pr_number }}');

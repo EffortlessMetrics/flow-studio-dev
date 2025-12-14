@@ -1,0 +1,20 @@
+Flow: flow-gate
+File: C:\Code\Swarm\demo-swarm-dev\swarm\flows\flow-gate.md
+Steps parsed: 10
+
+Step 1 artifacts:
+  - build_receipt.json: OK
+Step 2 artifacts:
+  - contract_status.md: OK
+Step 3 artifacts:
+  - security_status.md: OK
+Step 4 artifacts:
+  - perf_status.md: OK
+Step 5 artifacts:
+  - gate_fix_summary.md: OK
+Step 6 artifacts:
+  - gate_risk_report.md: OK
+Step 7 artifacts:
+  - policy_verdict.md: OK
+Step 8 artifacts:
+  - merge_recommendation.md: OK

@@ -1,0 +1,3 @@
+{"timestamp": "2025-12-09T10:20:36.154572+00:00Z", "role": "system", "content": "Executing step smoke with agent smoke-verifier"}
+{"timestamp": "2025-12-09T10:20:36.154572+00:00Z", "role": "user", "content": "Step role: Run health checks if endpoints available. Verify artifact/release existence. Append results to verification_report.md."}
+{"timestamp": "2025-12-09T10:20:36.154596+00:00Z", "role": "assistant", "content": "[STUB] Completed step smoke. In production, this would contain the actual Claude response."}

@@ -1,0 +1,11 @@
+[project]
+name = "agent-sdk-py-example"
+version = "1.0.0"
+description = "Demo: Use Claude Agent SDK to drive swarm flows"
+requires-python = ">=3.10"
+dependencies = [
+    "claude-code-sdk>=0.1.0",
+]
+
+[project.scripts]
+demo = "agent_sdk_demo:main"

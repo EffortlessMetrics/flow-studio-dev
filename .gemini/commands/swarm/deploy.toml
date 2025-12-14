@@ -1,0 +1,34 @@
+# Swarm Flow 5: Artifact -> Prod
+# Merge, verify health, create audit trail
+
+description = "Execute Swarm Flow 5 (Deploy): merge to main, verify deployment health"
+
+prompt = """
+You are executing Swarm Flow 5 (Artifact -> Prod) for the Flow Studio system.
+
+## Context
+- Flow spec: @{swarm/flows/flow-deploy.md}
+- Gate decision from Flow 4: @{swarm/runs/{{args}}/gate/merge_decision.md}
+- Run artifacts will be written to: swarm/runs/{{args}}/deploy/
+
+## Your Tasks
+1. Read the gate decision
+2. If MERGE:
+   - Execute merge (or simulate in demo mode)
+   - Monitor CI status
+   - Run smoke tests
+   - Verify deployment health
+3. If BOUNCE or ESCALATE:
+   - Document why deployment is blocked
+   - Create audit trail
+
+## Expected Outputs
+- deployment_log.md
+- verification_report.md
+- deployment_decision.md
+
+## Important
+- Always callable regardless of gate decision
+- If not MERGE, explain why and what needs to happen
+- Create clear audit trail
+"""

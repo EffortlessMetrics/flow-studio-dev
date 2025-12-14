@@ -1,0 +1,76 @@
+# Selftest Configuration
+# ----------------------
+# Define your project's selftest steps organized into three tiers:
+#   - KERNEL: Critical checks that must pass (lint, compile, basic tests)
+#   - GOVERNANCE: Policy checks that should pass (security, coverage thresholds)
+#   - OPTIONAL: Nice-to-have checks (performance, experimental features)
+#
+# Place this file at your repo root. The selftest CLI finds it automatically.
+# Run: selftest run
+
+# Step definitions
+steps:
+  # --- KERNEL TIER ---
+  # These checks must pass. KERNEL failures block everything.
+
+  - id: lint
+    tier: kernel
+    command: ruff check . --fix --exit-non-zero-on-fix
+    description: "Python linting with ruff"
+    severity: critical
+    category: correctness
+    timeout: 60
+
+  - id: compile
+    tier: kernel
+    command: python -m compileall -q .
+    description: "Verify all Python files compile"
+    severity: critical
+    category: correctness
+    timeout: 30
+
+  - id: unit-tests
+    tier: kernel
+    command: pytest tests/ -q --tb=short
+    description: "Run unit tests"
+    severity: critical
+    category: correctness
+    timeout: 300
+
+  # --- GOVERNANCE TIER ---
+  # Policy checks that should pass. Failures block merge but not KERNEL.
+
+  - id: security-scan
+    tier: governance
+    command: bandit -r src/ -ll -q || echo "bandit not installed, skipping"
+    description: "Security scanning with bandit"
+    severity: warning
+    category: security
+    timeout: 120
+
+  - id: coverage-check
+    tier: governance
+    command: pytest tests/ --cov=src --cov-fail-under=70 -q || echo "coverage check"
+    description: "Ensure test coverage meets threshold"
+    severity: warning
+    category: governance
+    timeout: 300
+    dependencies:
+      - unit-tests
+
+  # --- OPTIONAL TIER ---
+  # Nice-to-have checks. Failures are warnings only.
+
+  - id: type-check
+    tier: optional
+    command: mypy src/ --ignore-missing-imports || echo "mypy not installed, skipping"
+    description: "Static type checking with mypy"
+    severity: info
+    category: correctness
+    timeout: 180
+
+# Execution settings (optional)
+mode: strict
+verbose: false
+write_report: true
+report_path: selftest_report.json

@@ -1,0 +1,20 @@
+{
+  "engine": "claude-step",
+  "mode": "stub",
+  "provider": "anthropic",
+  "model": "claude-stub",
+  "step_id": "normalize",
+  "flow_key": "signal",
+  "run_id": "run-20251209-093851-zhdxx7",
+  "agent_key": "signal-normalizer",
+  "started_at": "2025-12-09T09:38:51.044223+00:00Z",
+  "completed_at": "2025-12-09T09:38:51.044874+00:00Z",
+  "duration_ms": 0,
+  "status": "succeeded",
+  "tokens": {
+    "prompt": 0,
+    "completion": 0,
+    "total": 0
+  },
+  "transcript_path": "llm/normalize-signal-normalizer-claude.jsonl"
+}

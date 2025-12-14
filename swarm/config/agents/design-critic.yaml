@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: design-critic
+flows:
+  - plan
+category: critic
+color: red
+source: project/user
+short_role: "Validate design vs constraints → design_validation.md. Never fixes."
+model: inherit

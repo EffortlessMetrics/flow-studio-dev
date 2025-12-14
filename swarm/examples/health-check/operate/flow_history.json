@@ -1,0 +1,19 @@
+{
+  "runs": [
+    {
+      "flow": "health-check",
+      "timestamp": "2025-11-25T00:00:00Z",
+      "steps": ["signal","plan","build","gate"]
+    }
+  ]
+}
+{
+  "issue": "Add /health endpoint",
+  "flows": [
+    {"name": "signal", "summary": "Normalized issue and requirements"},
+    {"name": "plan", "summary": "ADR + test/work/policy plans"},
+    {"name": "build", "summary": "Implemented handler scaffold + tests"},
+    {"name": "gate", "summary": "Gate passed (low risk)"},
+    {"name": "operate", "summary": "Deployment checks OK"}
+  ]
+}

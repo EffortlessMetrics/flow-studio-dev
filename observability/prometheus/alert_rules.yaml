@@ -1,0 +1,197 @@
+# Prometheus Alert Rules for Selftest Metrics
+# Based on SLOs defined in observability/slos/selftest_slos.yaml
+#
+# Alert Severities:
+#   - critical: Page on-call immediately (PagerDuty/OpsGenie)
+#   - warning: Create ticket, investigate within 24h
+#   - info: Log for trend analysis, no immediate action
+#
+# Installation:
+#   cp alert_rules.yaml /etc/prometheus/rules/selftest_alerts.yaml
+#   curl -X POST http://localhost:9090/-/reload
+#
+# Reference: docs/designs/OBSERVABILITY_PLUGINS_DESIGN.md
+#
+# SAFETY MODEL:
+# - PASSIVE ALERTS: Prometheus fires notifications only, no remediation
+# - HUMAN DECISION: Runbook URLs point to human-reviewed procedures
+# - NOT AUTO-FIXING: Alert triggers -> notification -> manual investigation
+
+groups:
+  - name: selftest_slo_alerts
+    rules:
+      # ========================================================================
+      # CRITICAL: Kernel Failures (Tier 1 - Page Immediately)
+      # ========================================================================
+
+      - alert: SelftestKernelFailure
+        expr: selftest:kernel_failure_rate:5m > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          tier: kernel
+          slo: availability
+        annotations:
+          summary: "Selftest kernel failures detected"
+          description: |
+            Kernel failure rate {{ $value | printf "%.2f" }}% exceeds 1% threshold.
+            Kernel failures indicate core infrastructure problems that block CI/CD.
+          runbook_url: "https://github.com/org/repo/docs/runbooks/selftest-kernel-failure.md"
+          dashboard_url: "http://grafana:3000/d/selftest?viewPanel=kernel"
+
+      - alert: SelftestKernelBlocked
+        expr: increase(selftest_step_total{tier="kernel",status="blocked"}[5m]) > 0
+        for: 0s
+        labels:
+          severity: critical
+          tier: kernel
+        annotations:
+          summary: "Selftest kernel step blocked"
+          description: |
+            A kernel step has BLOCKED status, indicating configuration or environment issues.
+            This prevents selftest from completing and blocks CI/CD.
+          runbook_url: "https://github.com/org/repo/docs/runbooks/selftest-blocked.md"
+
+      # ========================================================================
+      # HIGH: Availability SLO Breach (Tier 2 - Urgent Ticket)
+      # ========================================================================
+
+      - alert: SelftestAvailabilitySLOBreach
+        expr: selftest:availability:success_rate:30d < 99
+        for: 5m
+        labels:
+          severity: critical
+          slo: availability
+        annotations:
+          summary: "Selftest availability SLO breached"
+          description: |
+            Success rate {{ $value | printf "%.2f" }}% is below 99% target over 30 days.
+            Error budget exhausted - immediate action required.
+          runbook_url: "https://github.com/org/repo/docs/runbooks/selftest-availability-slo.md"
+          dashboard_url: "http://grafana:3000/d/selftest?viewPanel=availability"
+
+      - alert: SelftestAvailabilitySLOWarning
+        expr: selftest:availability:success_rate:30d < 99.5 and selftest:availability:success_rate:30d >= 99
+        for: 15m
+        labels:
+          severity: warning
+          slo: availability
+        annotations:
+          summary: "Selftest availability approaching SLO breach"
+          description: |
+            Success rate {{ $value | printf "%.2f" }}% is below 99.5% warning threshold.
+            Error budget is being consumed faster than expected.
+
+      # ========================================================================
+      # HIGH: Performance SLO Breach (Tier 2 - Urgent Ticket)
+      # ========================================================================
+
+      - alert: SelftestPerformanceSLOBreach
+        expr: selftest:run_duration_p95:5m > 120
+        for: 5m
+        labels:
+          severity: high
+          slo: performance
+        annotations:
+          summary: "Selftest performance SLO breached"
+          description: |
+            P95 duration {{ $value | printf "%.1f" }}s exceeds 120s target.
+            CI/CD pipeline may be experiencing delays.
+          runbook_url: "https://github.com/org/repo/docs/runbooks/selftest-performance-slo.md"
+          dashboard_url: "http://grafana:3000/d/selftest?viewPanel=duration"
+
+      - alert: SelftestPerformanceSLOWarning
+        expr: selftest:run_duration_p95:5m > 90 and selftest:run_duration_p95:5m <= 120
+        for: 15m
+        labels:
+          severity: warning
+          slo: performance
+        annotations:
+          summary: "Selftest performance approaching SLO breach"
+          description: |
+            P95 duration {{ $value | printf "%.1f" }}s exceeds 90s warning threshold.
+            Performance is degrading - investigate slow steps.
+
+      # ========================================================================
+      # WARNING: Governance Degraded (Tier 3 - Standard Ticket)
+      # ========================================================================
+
+      - alert: SelftestGovernanceDegraded
+        expr: selftest:governance_pass_rate:5m < 0.95
+        for: 15m
+        labels:
+          severity: warning
+          tier: governance
+        annotations:
+          summary: "Selftest governance pass rate below 95%"
+          description: |
+            Governance pass rate {{ $value | printf "%.2f" }}% is below 95% threshold.
+            Multiple governance checks are failing - review agent/flow definitions.
+          runbook_url: "https://github.com/org/repo/docs/runbooks/selftest-governance-degraded.md"
+
+      - alert: SelftestGovernanceStepFailing
+        expr: selftest:governance_pass_rate_by_step:5m < 0.8
+        for: 30m
+        labels:
+          severity: warning
+          tier: governance
+        annotations:
+          summary: "Selftest governance step consistently failing"
+          description: |
+            Step {{ $labels.step_id }} has pass rate {{ $value | printf "%.2f" }}% (below 80%).
+            This step needs investigation and remediation.
+
+      # ========================================================================
+      # WARNING: Degradation SLO Breach (Tier 3 - Standard Ticket)
+      # ========================================================================
+
+      - alert: SelftestDegradationSLOBreach
+        expr: selftest:degradation:max_count:24h > 3
+        for: 0s
+        labels:
+          severity: high
+          slo: degradation
+        annotations:
+          summary: "Selftest degradation SLO breached"
+          description: |
+            Step {{ $labels.step_id }} has degraded {{ $value }} times in 24h (limit: 3).
+            Repeated degradations indicate a systemic issue requiring investigation.
+          runbook_url: "https://github.com/org/repo/docs/runbooks/selftest-degradation-slo.md"
+
+      - alert: SelftestDegradationSLOWarning
+        expr: selftest:degradation:max_count:24h > 2 and selftest:degradation:max_count:24h <= 3
+        for: 1h
+        labels:
+          severity: warning
+          slo: degradation
+        annotations:
+          summary: "Selftest degradation approaching SLO breach"
+          description: |
+            Step {{ $labels.step_id }} has degraded {{ $value }} times in 24h (warning at 2).
+            Monitor for additional degradations.
+
+      # ========================================================================
+      # INFO: Trend Alerts (Tier 4 - Monitoring Only)
+      # ========================================================================
+
+      - alert: SelftestActiveDegradations
+        expr: selftest:degradations_active:current > 0
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "Selftest has active degradations"
+          description: |
+            {{ $value }} active degradation(s) detected.
+            System is operating in degraded mode but still functional.
+
+      - alert: SelftestSlowStep
+        expr: selftest:step_duration_p95:5m > 30
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: "Selftest step running slowly"
+          description: |
+            Step {{ $labels.step_id }} P95 duration {{ $value | printf "%.1f" }}s exceeds 30s.
+            Consider optimizing this step to improve overall performance.

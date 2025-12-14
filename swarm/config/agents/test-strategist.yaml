@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: test-strategist
+flows:
+  - plan
+category: spec
+color: purple
+source: project/user
+short_role: "Map BDD scenarios to test types → test_plan.md."
+model: inherit

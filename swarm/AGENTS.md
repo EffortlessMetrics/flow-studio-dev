@@ -1,0 +1,178 @@
+# Swarm Agent Registry
+
+> Minimal viable swarm: 45 domain agents across 6 flows + 3 built-in infra.
+> Domain agents live under `.claude/agents/*.md`.
+> Built-in infra agents are native to Claude Code and have no `.claude/agents` files.
+
+<!-- META:AGENT_COUNTS -->
+**Total: 48 agents** (3 built-in + 45 domain)
+<!-- /META:AGENT_COUNTS -->
+
+---
+
+## Orchestration Model
+
+The swarm has **two execution levels**:
+
+### 1. Orchestrator (top-level Claude)
+
+- Can call **all agents**: built-in (`explore`, `plan-subagent`, `general-subagent`) and domain (`.claude/agents/*.md`)
+- Interprets agent outputs (status, recommended_next) to decide routing
+- Controls microloop iteration in Flows 1, 3
+- May use `explore` to gather context before invoking domain agents
+
+### 2. All Agents (built-in and domain)
+
+- **Built-in agents** (`explore`, `plan-subagent`, `general-subagent`): provided by Claude Code, no local definition files
+- **Domain agents**: defined in `.claude/agents/*.md` with frontmatter + prompt
+- All agents inherit full tooling from the main Claude Code session (no `tools:` restriction)
+- Behavior is constrained by prompts, not tool denial—prompts specify what agents may/must not do
+- All agents use Skills when declared in frontmatter
+- All agents read inputs from files, write outputs to files
+
+### Current Implementation Constraint
+
+Due to Claude Code limitations, **domain agents currently cannot call other agents** (including built-ins). This is a runtime constraint, not a design requirement. If agent→agent calls become available, the swarm would work fine with them—the orchestrator would simply have more delegation options.
+
+For now: agents are pure tool-users. Only the orchestrator coordinates multiple agents.
+
+---
+
+## Agent Philosophy
+
+- **Agents never block**: Document concerns in receipts and continue.
+- **Critics never fix**: Critics write harsh receipts; implementers apply fixes.
+- **Multi-path completion**: Report VERIFIED/UNVERIFIED/BLOCKED states, not fake success.
+
+---
+
+## All Agents
+
+| Key | Flows | Role Family | Color | Source | Short Role |
+|-----|-------|-------------|-------|--------|------------|
+| explore | all | infra | cyan | built-in | Fast Haiku read-only search (Glob/Grep/Read/Bash). |
+| plan-subagent | plan | infra | cyan | built-in | High-level repo analyzer for complex architecture. |
+| general-subagent | (implicit) | infra | cyan | built-in | Generic Task worker. |
+| clarifier | 1, 2, 3 | shaping | yellow | project/user | Detect ambiguities, draft clarification questions. |
+| risk-analyst | 1, 2, 4, 6 | analytics | orange | project/user | Identify risk patterns (security, compliance, data, performance). |
+| policy-analyst | 2, 4 | analytics | orange | project/user | Interpret policy docs vs change, assess policy implications. |
+| repo-operator | 3, 5 | implementation | green | project/user | Git workflows: branch, commit, merge, tag. Safe Bash only. |
+| gh-reporter | all | reporter | pink | project/user | Post summaries to GitHub issues/PRs at flow boundaries. |
+| swarm-ops | (utility) | infra | cyan | project/user | Guide for agent operations: model changes, adding agents, inspecting flows. |
+| ux-critic | (utility) | critic | red | project/user | Inspect Flow Studio screens and produce structured JSON critiques. |
+| ux-implementer | (utility) | implementation | green | project/user | Apply UX critique fixes to Flow Studio code and run tests. |
+| signal-normalizer | signal | shaping | yellow | project/user | Parse raw input, find related context → issue_normalized.md, context_brief.md. |
+| problem-framer | signal | shaping | yellow | project/user | Synthesize normalized signal → problem_statement.md. |
+| requirements-author | signal | spec | purple | project/user | Write functional + non-functional requirements → requirements.md. |
+| requirements-critic | signal | critic | red | project/user | Verify requirements are testable, consistent → requirements_critique.md. |
+| bdd-author | signal | spec | purple | project/user | Turn requirements into BDD scenarios → features/*.feature. |
+| scope-assessor | signal | shaping | yellow | project/user | Stakeholders, risks, T-shirt size → stakeholders.md, early_risks.md, scope_estimate.md. |
+| impact-analyzer | plan | analytics | orange | project/user | Map affected services/modules/files → impact_map.json. |
+| design-optioneer | plan | design | purple | project/user | Propose 2-3 architecture options with trade-offs → design_options.md. |
+| adr-author | plan | design | purple | project/user | Write ADR for chosen design → adr.md. |
+| interface-designer | plan | spec | purple | project/user | API contracts, data models, migrations → api_contracts.yaml, schema.md. |
+| observability-designer | plan | spec | purple | project/user | Metrics, logs, traces, SLOs, alerts → observability_spec.md. |
+| test-strategist | plan | spec | purple | project/user | Map BDD scenarios to test types → test_plan.md. |
+| work-planner | plan | design | purple | project/user | Break design into subtasks, define rollout strategy → work_plan.md. |
+| design-critic | plan | critic | red | project/user | Validate design vs constraints → design_validation.md. Never fixes. |
+| context-loader | build | implementation | green | project/user | Load relevant code/tests/specs for subtask → subtask_context_manifest.json. |
+| test-author | build | implementation | green | project/user | Write/update tests → tests/*, test_changes_summary.md. |
+| test-critic | build | critic | red | project/user | Harsh review vs BDD/spec → test_critique.md. |
+| code-implementer | build | implementation | green | project/user | Write code to pass tests, following ADR → src/*, impl_changes_summary.md. |
+| code-critic | build | critic | red | project/user | Harsh review vs ADR/contracts → code_critique.md. |
+| mutator | build | verification | blue | project/user | Run mutation tests → mutation_report.md. |
+| fixer | build | implementation | green | project/user | Apply targeted fixes from critics/mutation → fix_summary.md. |
+| doc-writer | build | implementation | green | project/user | Update inline docs, READMEs, API docs → doc_updates.md. |
+| self-reviewer | build | verification | blue | project/user | Final review → self_review.md, build_receipt.json. |
+| receipt-checker | gate | verification | blue | project/user | Verify build_receipt.json exists and is complete → receipt_audit.md. |
+| contract-enforcer | gate | verification | blue | project/user | Check API changes vs contracts → contract_compliance.md. |
+| security-scanner | gate | verification | blue | project/user | Run SAST, secret scans → security_scan.md. |
+| coverage-enforcer | gate | verification | blue | project/user | Verify test coverage meets thresholds → coverage_audit.md. |
+| gate-fixer | gate | implementation | green | project/user | Mechanical fixes only (lint/format/docs) → gate_fix_summary.md. |
+| merge-decider | gate | verification | blue | project/user | Synthesize all checks → merge_decision.md (MERGE/BOUNCE/ESCALATE). |
+| deploy-monitor | deploy | verification | blue | project/user | Watch CI/deployment events → verification_report.md. |
+| smoke-verifier | deploy | verification | blue | project/user | Health checks, artifact verification → verification_report.md. |
+| deploy-decider | deploy | verification | blue | project/user | Verify operationalization FRs (FR-OP-001..005) → deployment_decision.md (STABLE/NOT_DEPLOYED/BLOCKED/INVESTIGATE). |
+| artifact-auditor | wisdom | verification | blue | project/user | Verify all expected artifacts from Flows 1-5 exist → artifact_audit.md. |
+| regression-analyst | wisdom | analytics | orange | project/user | Tests, coverage, issues, blame → regression_report.md. |
+| flow-historian | wisdom | analytics | orange | project/user | Compile timeline → flow_history.json. |
+| learning-synthesizer | wisdom | analytics | orange | project/user | Extract lessons from receipts, critiques → learnings.md. |
+| feedback-applier | wisdom | analytics | orange | project/user | Create issues, suggest doc updates → feedback_actions.md. |
+
+---
+
+## Summary
+
+<!-- META:AGENT_COUNTS -->
+**Total: 48 agents** (3 built-in + 45 domain)
+<!-- /META:AGENT_COUNTS -->
+
+| Category | Count | Notes |
+|----------|-------|-------|
+| Built-in (orchestrator-only) | 3 | `explore`, `plan-subagent`, `general-subagent` |
+| Cross-cutting | 5 | Used across multiple flows |
+| Utility | 3 | `swarm-ops`, `ux-critic`, `ux-implementer` |
+| Flow 1 (Signal) | 6 | |
+| Flow 2 (Plan) | 8 | |
+| Flow 3 (Build) | 9 | |
+| Flow 4 (Gate) | 6 | |
+| Flow 5 (Deploy) | 3 | |
+| Flow 6 (Wisdom) | 5 | |
+
+### Agent Categories
+
+- **shaping**: Problem framing, clarification
+- **spec**: Requirements, BDD, contracts, observability, test plans
+- **design**: Architecture options, ADRs, trade-offs, impact mapping
+- **impl**: Code, tests, docs, fixes
+- **critic**: Harsh reviews in microloops (never fix)
+- **verify**: Receipt audits, contract checks, security scans, coverage
+- **deploy**: CI monitoring, smoke tests
+- **analytics**: Test analysis, regressions, learnings, flow history
+- **reporter**: GitHub issue/PR summaries
+- **git**: Branch, commit, merge, tag operations
+
+### Key Principles
+
+1. **All agents are orchestrator-only**: Only top-level Claude calls agents (built-in or domain)
+2. **Agents currently can't call agents**: Due to Claude Code limitations, not design (runtime constraint)
+3. Agents never block; document concerns and continue
+4. Critics never fix; they write harsh receipts
+5. Multi-path completion: VERIFIED/UNVERIFIED/BLOCKED states
+6. Microloops in Flow 1 (requirements) and Flow 3 (tests, code)
+7. Human reviews receipts at flow boundaries
+
+---
+
+## Flow Details
+
+### Flow 1: Signal → Spec (6 agents)
+**Question**: What problem, for whom?
+**Agents**: signal-normalizer, problem-framer, requirements-author, requirements-critic, bdd-author, scope-assessor
+**Cross-cutting**: clarifier, risk-analyst, gh-reporter
+
+### Flow 2: Spec → Design (8 agents)
+**Question**: What architecture solves it?
+**Agents**: impact-analyzer, design-optioneer, adr-author, interface-designer, observability-designer, test-strategist, work-planner, design-critic
+**Cross-cutting**: clarifier, risk-analyst, policy-analyst, gh-reporter
+
+### Flow 3: Design → Code (9 agents)
+**Question**: Does implementation match design?
+**Agents**: context-loader, test-author, test-critic, code-implementer, code-critic, mutator, fixer, doc-writer, self-reviewer
+**Microloops**: test-author ⇄ test-critic, code-implementer ⇄ code-critic
+**Cross-cutting**: clarifier, repo-operator, gh-reporter
+
+### Flow 4: Code → Artifact (6 agents)
+**Question**: Is this merge-eligible?
+**Agents**: receipt-checker, contract-enforcer, security-scanner, coverage-enforcer, gate-fixer, merge-decider
+**Cross-cutting**: risk-analyst, policy-analyst, gh-reporter
+
+### Flow 5: Artifact → Prod (3 agents)
+**Question**: Is deployment healthy?
+**Agents**: deploy-monitor, smoke-verifier, deploy-decider
+**Cross-cutting**: repo-operator, gh-reporter
+
+### Flow 6: Prod → Wisdom (5 agents)
+**Question**: What did we learn?
+**Agents**: artifact-auditor, regression-analyst, flow-historian, learning-synthesizer, feedback-applier
+**Cross-cutting**: risk-analyst, gh-reporter

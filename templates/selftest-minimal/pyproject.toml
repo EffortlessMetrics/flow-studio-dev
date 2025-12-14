@@ -1,0 +1,19 @@
+[project]
+name = "my-project"
+version = "0.1.0"
+description = "Project with selftest integration"
+requires-python = ">=3.10"
+dependencies = [
+    "selftest-core>=0.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

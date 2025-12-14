@@ -1,0 +1,4 @@
+{
+  "kubernetes": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/",
+  "examples": ["https://docs.rs/actix-web/latest/actix_web/", "https://docs.rs/axum/latest/axum/"]
+}

@@ -1,0 +1,20 @@
+{
+  "engine": "claude-step",
+  "mode": "stub",
+  "provider": "anthropic",
+  "model": "claude-stub",
+  "step_id": "learnings",
+  "flow_key": "wisdom",
+  "run_id": "run-20251209-102043-n7mtao",
+  "agent_key": "learning-synthesizer",
+  "started_at": "2025-12-09T10:20:43.253996+00:00Z",
+  "completed_at": "2025-12-09T10:20:43.254042+00:00Z",
+  "duration_ms": 0,
+  "status": "succeeded",
+  "tokens": {
+    "prompt": 0,
+    "completion": 0,
+    "total": 0
+  },
+  "transcript_path": "llm/learnings-learning-synthesizer-claude.jsonl"
+}

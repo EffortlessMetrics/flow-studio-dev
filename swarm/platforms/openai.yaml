@@ -1,0 +1,22 @@
+name: openai-codecs
+description: >
+  OpenAI Codecs agent/command adapter profile (future platform).
+
+platform_key: openai
+
+agents_dir: .openai/agents
+commands_dir: .openai/commands
+
+frontmatter:
+  allowed_keys:
+    - name
+    - description
+    - model
+    - color
+    - skills
+
+# Model mapping: tier -> concrete model string (flattened for simple YAML parser)
+model_tier_fast: gpt-5.1-codex-mini
+model_tier_balanced: gpt-5.1-codex
+model_tier_deep: gpt-5-pro
+model_tier_fallback: gpt-5.1-codex

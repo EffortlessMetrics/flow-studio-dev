@@ -1,0 +1,333 @@
+---
+# spec_ledger.yaml
+# Master specification ledger for the Swarm SDLC
+#
+# This file tracks all major features, stories, and acceptance criteria
+# that bring the Swarm under governance. Each story links to:
+# - Acceptance criteria with specific tests
+# - Feature scenarios (BDD in Gherkin)
+# - Documentation references
+#
+# The ledger serves as the source of truth for what the Swarm guarantees
+# and how those guarantees are verified.
+#
+# Status tracking:
+# - PENDING: AC not yet started or tested
+# - IN_PROGRESS: AC work underway, tests passing/failing
+# - VERIFIED: AC tests all pass
+# - BLOCKED: AC cannot proceed due to dependencies or external issues
+
+stories:
+  - id: STORY-SELFTEST-RESILIENCE
+    title: "Selftest is resilient and decomposable"
+    description: >
+      The selftest system must be robust, introspectable, and recoverable.
+      Failures should be localized to specific steps, not collapse the entire
+      system. Teams should be able to work around governance failures temporarily
+      while fixing the underlying issue.
+    priority: P0
+    epic: governance
+    acceptance_criteria:
+      # AC-1: Kernel health check exists and is fast
+      - id: AC-SELFTEST-KERNEL-FAST
+        text: >
+          Running `make kernel-smoke` or `uv run swarm/tools/kernel_smoke.py`
+          completes in under 0.5 seconds and accurately reports whether the kernel
+          (core Rust tooling: cargo fmt, clippy, unit tests) is healthy.
+          Exit code 0 = HEALTHY, exit code 1 = BROKEN.
+        tests:
+          - type: unit
+            command: "cargo test selftest::kernel_smoke"
+            description: "Unit test for kernel smoke check logic"
+          - type: integration
+            command: "make kernel-smoke"
+            description: "End-to-end kernel smoke test, must complete under 0.5s"
+        status: PENDING
+        owner: selftest-author
+
+      # AC-2: Selftest is introspectable
+      - id: AC-SELFTEST-INTROSPECTABLE
+        text: >
+          Running `make selftest --plan` or `uv run swarm/tools/selftest.py --plan`
+          shows all 16 steps with unique IDs, descriptions, tiers (KERNEL/GOVERNANCE/OPTIONAL),
+          and dependencies in under 0.2 seconds. Output is machine-parseable (JSON with --json flag).
+        tests:
+          - type: bdd
+            tag: "@AC-SELFTEST-INTROSPECTABLE"
+            file: "features/selftest.feature"
+            description: "BDD scenario verifying plan command output"
+          - type: unit
+            command: "cargo test selftest::plan_mode"
+            description: "Unit test for plan rendering and JSON output"
+        status: PENDING
+        owner: selftest-author
+
+      # AC-3: Selftest can run individual steps
+      - id: AC-SELFTEST-INDIVIDUAL-STEPS
+        text: >
+          Running `make selftest --step <step-id>` or `uv run swarm/tools/selftest.py --step <id>`
+          executes only the specified step(s). Running `--until <id>` runs steps 1 through id.
+          Output shows step name, status (PASS/FAIL), elapsed time, and error messages.
+          Can be used to isolate and debug failures.
+        tests:
+          - type: bdd
+            tag: "@AC-SELFTEST-INDIVIDUAL-STEPS"
+            file: "features/selftest.feature"
+            description: "BDD scenario for --step and --until flags"
+          - type: integration
+            command: "make selftest --step core-checks && make selftest --until skills-governance"
+            description: "Verify step isolation works"
+        status: PENDING
+        owner: selftest-author
+
+      # AC-4: Selftest degraded mode
+      - id: AC-SELFTEST-DEGRADED
+        text: >
+          Running `make selftest --degraded` or `uv run swarm/tools/selftest.py --degraded`
+          fails only if KERNEL tier steps fail. GOVERNANCE and OPTIONAL tier failures are
+          logged as warnings but do not affect exit code. The overall exit code is 0 if all
+          KERNEL steps pass. The /platform/status endpoint reflects the degraded state with
+          state="DEGRADED".
+        tests:
+          - type: bdd
+            tag: "@AC-SELFTEST-DEGRADED"
+            file: "features/selftest.feature"
+            description: "BDD scenario for degraded mode with GOVERNANCE failures"
+          - type: unit
+            command: "cargo test selftest::degraded_mode"
+            description: "Unit test for degraded mode exit code logic"
+        status: PENDING
+        owner: selftest-author
+
+      # AC-5: Selftest failure hints
+      - id: AC-SELFTEST-FAILURE-HINTS
+        text: >
+          When selftest fails, the error output (stderr/stdout) and /platform/status
+          endpoint return actionable hints for diagnosis. Example hints:
+          "KERNEL failure: Run: make kernel-smoke --verbose"
+          "GOVERNANCE failure: Run: make selftest --step <id> --verbose"
+          "See docs: swarm/SELFTEST_SYSTEM.md"
+        tests:
+          - type: integration
+            file: "features/selftest.feature"
+            tag: "@AC-SELFTEST-FAILURE-HINTS"
+            description: "Verify failure output includes diagnostic hints"
+          - type: unit
+            command: "cargo test selftest::error_hints"
+            description: "Unit test for hint generation"
+        status: PENDING
+        owner: selftest-author
+
+      # AC-6: Governance degradation is tracked
+      - id: AC-SELFTEST-DEGRADATION-TRACKED
+        text: >
+          When GOVERNANCE tier steps fail, the failure is logged with timestamp, step ID,
+          step name, tier, error message, and suggested remediation in a persistent log
+          (selftest_degradations.log in the repo root). This allows teams to track and
+          prioritize governance fixes. The log is human- and machine-readable.
+        tests:
+          - type: unit
+            command: "cargo test selftest::degradation_logging"
+            description: "Unit test for degradation log entry formatting"
+          - type: integration
+            description: "Verify log file is created and entries are present after GOVERNANCE failures"
+        status: PENDING
+        owner: selftest-author
+
+  - id: STORY-SELFTEST-HEALING
+    title: "Agents can diagnose and repair selftest failures"
+    description: >
+      Provide a heal_selftest skill that guides agents (and humans) through
+      diagnostic procedures to identify and fix selftest failures systematically.
+      Covers all 16 steps with error patterns, common causes, and remediation strategies.
+    priority: P0
+    epic: governance
+    acceptance_criteria:
+      - id: AC-HEAL-SKILL-EXISTS
+        text: >
+          A `.claude/skills/heal_selftest/SKILL.md` file exists with
+          comprehensive diagnostic procedures, common error patterns, and
+          remediation strategies for all 16 selftest steps. File must have
+          valid YAML frontmatter (name, description, allowed-tools, category, tier).
+        tests:
+          - type: lint
+            command: "swarm/tools/validate_swarm.py --skills-only"
+            description: "Validate skill frontmatter and structure"
+          - type: unit
+            description: "Verify heal_selftest skill is registered"
+        status: VERIFIED
+        owner: selftest-author
+
+      - id: AC-HEAL-DIAGNOSTIC-COMPLETE
+        text: >
+          The heal_selftest skill includes a 7-step diagnostic procedure:
+          1. Kernel health check (make kernel-smoke)
+          2. Show selftest plan (see all steps and tiers)
+          3. Identify failures (run full selftest, capture output)
+          4. Run failed steps individually (--step flag)
+          5. Categorize errors (syntax, logic, dependency, etc.)
+          6. Determine severity (P0 KERNEL, P1/P2 GOVERNANCE, P3 OPTIONAL)
+          7. Propose targeted fixes (with code diffs and commands).
+          Each step includes exact commands, expected output, and interpretation.
+        tests:
+          - type: manual
+            description: "Verify healing skill has all 7 steps with exact commands"
+        status: VERIFIED
+        owner: selftest-author
+
+      - id: AC-HEAL-ESCALATION-RULES
+        text: >
+          The skill documents when to escalate vs. when to fix:
+          - KERNEL failures → P0, must fix before any merge
+          - GOVERNANCE failures → P1/P2, can use --degraded mode short-term
+          - OPTIONAL failures → P3, can be disabled with documented ADR.
+          Includes decision table and escalation flowchart.
+        tests:
+          - type: manual
+            description: "Verify escalation matrix and decision tree in skill"
+        status: VERIFIED
+        owner: selftest-author
+
+  - id: STORY-SELFTEST-SPEC-COVERAGE
+    title: "Selftest acceptance criteria are verifiable and tracked"
+    description: >
+      Each acceptance criterion for the selftest system is linked to
+      executable tests. A spec_ledger.yaml file serves as the master
+      record, and a corresponding BDD feature file (selftest.feature)
+      contains scenarios that verify ACs.
+    priority: P0
+    epic: governance
+    acceptance_criteria:
+      - id: AC-SPEC-LEDGER-EXISTS
+        text: >
+          A specs/spec_ledger.yaml file exists in the repo root containing
+          at least 2 stories (SELFTEST-RESILIENCE and SELFTEST-HEALING) with
+          6+ acceptance criteria each. Each AC must have id, text, tests array,
+          and status field.
+        tests:
+          - type: lint
+            command: "python3 -c 'import yaml; yaml.safe_load(open(\"specs/spec_ledger.yaml\"))'"
+            description: "Validate YAML syntax"
+          - type: integration
+            description: "Verify file exists with required structure"
+        status: PENDING
+        owner: spec-author
+
+      - id: AC-SPEC-BDD-SCENARIOS
+        text: >
+          A features/selftest.feature file exists with BDD scenarios tagged
+          with AC IDs (e.g., @AC-SELFTEST-KERNEL-FAST). Scenarios use Gherkin
+          (Given/When/Then) format and cover at least 5 acceptance criteria.
+        tests:
+          - type: lint
+            command: "grep -E '^\\s*@AC-' features/selftest.feature"
+            description: "Verify AC tags are present in scenarios"
+          - type: integration
+            description: "Run BDD scenarios with cucumber runner"
+        status: PENDING
+        owner: spec-author
+
+      - id: AC-SPEC-CROSS-REFS
+        text: >
+          The spec_ledger.yaml and features/selftest.feature are
+          cross-referenced. Each AC in the ledger lists file and tag
+          location. Each scenario in the feature file is tagged with
+          its AC ID and links back to the ledger.
+        tests:
+          - type: integration
+            description: "Verify bidirectional reference consistency"
+        status: PENDING
+        owner: spec-author
+
+  - id: STORY-SELFTEST-DOCUMENTATION
+    title: "Selftest governance and operations are documented"
+    description: >
+      Comprehensive documentation explaining selftest architecture,
+      the 16 steps, governance tiers, remediation strategies, and
+      integration with Flow 3 (Build).
+    priority: P1
+    epic: governance
+    acceptance_criteria:
+      - id: AC-SELFTEST-SYSTEM-DOC
+        text: >
+          A docs/SELFTEST_SYSTEM.md file exists documenting:
+          - Architecture and design goals
+          - The 16 selftest steps with tier, description, expected runtime
+          - Governance model (KERNEL, GOVERNANCE, OPTIONAL)
+          - How selftest integrates with Flows 1-6
+          - Known issues and limitations
+          Links to heal_selftest skill and spec_ledger.yaml.
+        tests:
+          - type: lint
+            command: "grep -E '(KERNEL|GOVERNANCE|OPTIONAL|16 steps)' docs/SELFTEST_SYSTEM.md"
+            description: "Verify key sections present"
+        status: PENDING
+        owner: doc-writer
+
+      - id: AC-SELFTEST-GOVERNANCE-REF
+        text: >
+          A docs/SELFTEST_GOVERNANCE.md file exists with:
+          - Quick reference table of 16 steps (id, tier, description, runtime)
+          - Remediation strategies for common errors (one per step)
+          - When to use --degraded mode
+          - Escalation decision tree
+          - Links to heal_selftest skill examples.
+        tests:
+          - type: lint
+            command: "grep -E '(Quick reference|Remediation|Escalation)' docs/SELFTEST_GOVERNANCE.md"
+            description: "Verify governance reference sections"
+        status: PENDING
+        owner: doc-writer
+
+conformance:
+  description: >
+    Selftest conformance is verified by running:
+    1. `make selftest` — Full strict mode (all failures block)
+    2. `make selftest --degraded` — Degraded mode (KERNEL only)
+    3. `make selftest --plan` — Plan inspection
+    4. `make kernel-smoke` — Kernel health check
+    5. `features/selftest.feature` — BDD scenarios
+
+    All of these must pass for a change to be merge-eligible.
+
+  commands:
+    full_strict: "make selftest"
+    degraded: "make selftest --degraded"
+    plan: "make selftest --plan"
+    kernel: "make kernel-smoke"
+    bdd: "cucumber features/selftest.feature"
+
+  required_for: ["flow-3-build", "flow-4-gate", "flow-5-deploy"]
+
+governance_tiers:
+  KERNEL:
+    description: "Core repo health: Rust tooling, fmt, clippy, unit tests"
+    blocking: true
+    degradable: false
+    example_steps: ["core-checks"]
+
+  GOVERNANCE:
+    description: "Swarm specification compliance: agents, flows, skills, contracts"
+    blocking: true
+    degradable: true
+    example_steps: ["skills-governance", "agents-governance", "devex-contract", "graph-invariants"]
+
+  OPTIONAL:
+    description: "Nice-to-have checks: coverage thresholds, experimental tests"
+    blocking: false
+    degradable: true
+    example_steps: ["ac-coverage", "extras"]
+
+metadata:
+  version: "1.0"
+  last_updated: "2025-11-30"
+  owner: "selftest-author"
+  maintainers:
+    - selftest-author
+    - spec-author
+    - doc-writer
+  related_docs:
+    - docs/SWARM_FLOWS.md
+    - docs/SELFTEST_SYSTEM.md
+    - docs/SELFTEST_GOVERNANCE.md
+    - .claude/skills/heal_selftest/SKILL.md

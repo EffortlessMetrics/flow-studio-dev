@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: learning-synthesizer
+flows:
+  - wisdom
+category: analytics
+color: orange
+source: project/user
+short_role: "Extract lessons from receipts, critiques → learnings.md."
+model: inherit

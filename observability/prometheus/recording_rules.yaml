@@ -1,0 +1,167 @@
+# Prometheus Recording Rules for Selftest Metrics
+# These pre-compute common queries for dashboard performance and SLO tracking
+#
+# Installation:
+#   cp recording_rules.yaml /etc/prometheus/rules/selftest_recording.yaml
+#   curl -X POST http://localhost:9090/-/reload
+#
+# Reference: docs/designs/OBSERVABILITY_PLUGINS_DESIGN.md
+#
+# SAFETY MODEL:
+# - AGGREGATIONS ONLY: Pre-compute queries for Grafana dashboards
+# - READ-ONLY: Do not create/modify data, only aggregate existing metrics
+# - NO EXECUTION: Cannot trigger actions, only compute values
+
+groups:
+  - name: selftest_recording_rules
+    interval: 30s
+    rules:
+      # ========================================================================
+      # Pass Rate Metrics
+      # ========================================================================
+
+      # Pre-computed pass rate over 5 minutes (faster dashboard queries)
+      - record: selftest:pass_rate:5m
+        expr: |
+          sum(rate(selftest_step_total{status="pass"}[5m])) /
+          sum(rate(selftest_step_total[5m]))
+        labels:
+          sli: availability
+
+      # Pass rate by environment
+      - record: selftest:pass_rate_by_env:5m
+        expr: |
+          sum by (environment) (rate(selftest_step_total{status="pass"}[5m])) /
+          sum by (environment) (rate(selftest_step_total[5m]))
+        labels:
+          sli: availability
+
+      # ========================================================================
+      # Kernel Failure Metrics
+      # ========================================================================
+
+      # Kernel failure rate over 5 minutes
+      - record: selftest:kernel_failure_rate:5m
+        expr: |
+          sum(rate(selftest_step_total{tier="kernel",status="fail"}[5m])) /
+          sum(rate(selftest_step_total{tier="kernel"}[5m]))
+        labels:
+          sli: kernel_health
+          severity: critical
+
+      # Kernel failures total (for alerting)
+      - record: selftest:kernel_failures:5m
+        expr: |
+          sum(increase(selftest_step_total{tier="kernel",status="fail"}[5m]))
+        labels:
+          sli: kernel_health
+
+      # ========================================================================
+      # Governance Metrics
+      # ========================================================================
+
+      # Governance pass rate by step (for identifying problematic steps)
+      - record: selftest:governance_pass_rate_by_step:5m
+        expr: |
+          1 - (
+            sum by (step_id) (rate(selftest_step_total{tier="governance",status="fail"}[5m]))
+            / sum by (step_id) (rate(selftest_step_total{tier="governance"}[5m]))
+          )
+        labels:
+          sli: governance_health
+
+      # Overall governance pass rate
+      - record: selftest:governance_pass_rate:5m
+        expr: |
+          sum(rate(selftest_step_total{tier="governance",status="pass"}[5m])) /
+          sum(rate(selftest_step_total{tier="governance"}[5m]))
+        labels:
+          sli: governance_health
+
+      # ========================================================================
+      # Duration Metrics (Percentiles)
+      # ========================================================================
+
+      # P50 duration by step
+      - record: selftest:step_duration_p50:5m
+        expr: |
+          histogram_quantile(0.50,
+            sum by (le, step_id) (rate(selftest_step_duration_seconds_bucket[5m]))
+          )
+        labels:
+          percentile: "50"
+
+      # P95 duration by step
+      - record: selftest:step_duration_p95:5m
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le, step_id) (rate(selftest_step_duration_seconds_bucket[5m]))
+          )
+        labels:
+          percentile: "95"
+          sli: performance
+
+      # P99 duration by step
+      - record: selftest:step_duration_p99:5m
+        expr: |
+          histogram_quantile(0.99,
+            sum by (le, step_id) (rate(selftest_step_duration_seconds_bucket[5m]))
+          )
+        labels:
+          percentile: "99"
+
+      # Overall P95 run duration (for SLO tracking)
+      - record: selftest:run_duration_p95:5m
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(selftest_run_duration_seconds_bucket[5m]))
+          )
+        labels:
+          percentile: "95"
+          sli: performance
+
+      # ========================================================================
+      # Availability SLI (30-day window for SLO)
+      # ========================================================================
+
+      # Success rate over 30 days (SLO: 99%)
+      - record: selftest:availability:success_rate:30d
+        expr: |
+          (
+            sum(rate(selftest_step_total{tier!="optional"}[30d]))
+            - sum(rate(selftest_step_total{tier!="optional",status="fail"}[30d]))
+          ) / sum(rate(selftest_step_total{tier!="optional"}[30d])) * 100
+        labels:
+          slo: availability
+          target: "99"
+
+      # Performance P95 over 30 days (SLO: <= 120s)
+      - record: selftest:performance:p95_duration:30d
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(selftest_run_duration_seconds_bucket[30d]))
+          )
+        labels:
+          slo: performance
+          target: "120"
+
+      # ========================================================================
+      # Degradation Metrics
+      # ========================================================================
+
+      # Max degradations per step in 24h (SLO: <= 3)
+      - record: selftest:degradation:max_count:24h
+        expr: |
+          max by (step_id) (
+            sum_over_time(selftest_degradations_total[24h])
+          )
+        labels:
+          slo: degradation
+          target: "3"
+
+      # Active degradations count
+      - record: selftest:degradations_active:current
+        expr: |
+          sum(selftest_degradations_active)
+        labels:
+          sli: degradation_status

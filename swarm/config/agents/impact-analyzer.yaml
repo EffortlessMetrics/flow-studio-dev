@@ -1,0 +1,27 @@
+# swarm/config/agents/impact-analyzer.yaml
+# Provider-neutral agent definition (Phase 0.5)
+
+key: impact-analyzer
+
+flows:
+  - plan          # Flow 2: Spec → Design / Plan
+
+category: analytics
+color: orange
+source: project/user
+
+short_role: Analyze cross-cutting impact of changes and produce impact_map.json
+
+model: inherit
+
+# Optional, non-functional but nice to have for later phases:
+
+primary_artifact: impact_map.json
+
+artifacts:
+  - impact_map.json
+
+notes: >
+  Takes Flow 1 requirements and Flow 2 context, identifies affected systems,
+  code areas, and risk patterns, and writes a structured impact_map.json that
+  downstream agents can consume.

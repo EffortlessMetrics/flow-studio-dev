@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: doc-writer
+flows:
+  - build
+category: implementation
+color: green
+source: project/user
+short_role: "Update inline docs, READMEs, API docs → doc_updates.md."
+model: inherit

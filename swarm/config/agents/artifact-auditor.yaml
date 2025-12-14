@@ -1,0 +1,15 @@
+key: artifact-auditor
+flows:
+- wisdom
+category: verification
+color: blue
+source: project/user
+short_role: Verify all expected artifacts from Flows 1-5 exist
+model: haiku
+outputs:
+- path: RUN_BASE/wisdom/artifact_audit.md
+  format: markdown
+tags:
+- flow-6
+- wisdom
+- verification

@@ -1,0 +1,5 @@
+{
+  "title": "Swarm Selftest Baseline",
+  "description": "Baseline run for selftest validation. Shows expected governance and validation artifacts.",
+  "tags": ["baseline", "selftest", "governance"]
+}

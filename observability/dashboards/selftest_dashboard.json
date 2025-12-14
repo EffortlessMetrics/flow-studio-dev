@@ -1,0 +1,335 @@
+{
+  "dashboard": {
+    "title": "Selftest Governance Health",
+    "tags": ["selftest", "platform", "governance"],
+    "timezone": "browser",
+    "refresh": "1m",
+    "time": {
+      "from": "now-7d",
+      "to": "now"
+    },
+    "schemaVersion": 27,
+    "version": 1,
+    "templating": {
+      "list": [
+        {
+          "name": "environment",
+          "type": "query",
+          "datasource": "Prometheus",
+          "query": "label_values(selftest_step_total, environment)",
+          "multi": true,
+          "includeAll": true,
+          "refresh": 1
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Overall Status",
+        "type": "singlestat",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "selftest_run_overall_status{environment=~\"$environment\"}",
+            "legendFormat": "{{environment}}"
+          }
+        ],
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 6,
+          "h": 8
+        },
+        "gauge": {
+          "show": true,
+          "minValue": 0,
+          "maxValue": 1
+        },
+        "thresholds": "0.3,0.7",
+        "colors": ["red", "yellow", "green"],
+        "valueMaps": [
+          {"value": "0", "text": "BROKEN"},
+          {"value": "0.5", "text": "DEGRADED"},
+          {"value": "1", "text": "HEALTHY"}
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Governance Pass Rate (%)",
+        "type": "graph",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "selftest_governance_pass_rate{environment=~\"$environment\"}",
+            "legendFormat": "{{environment}}"
+          }
+        ],
+        "gridPos": {
+          "x": 6,
+          "y": 0,
+          "w": 18,
+          "h": 8
+        },
+        "yaxes": [
+          {
+            "label": "Pass Rate (%)",
+            "min": 0,
+            "max": 100,
+            "format": "percent"
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 95,
+            "colorMode": "critical",
+            "op": "lt",
+            "fill": true,
+            "line": true
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Active Degradations",
+        "type": "singlestat",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(selftest_degradations_active{environment=~\"$environment\"})",
+            "legendFormat": "Active"
+          }
+        ],
+        "gridPos": {
+          "x": 0,
+          "y": 8,
+          "w": 6,
+          "h": 4
+        },
+        "thresholds": "1,5",
+        "colors": ["green", "yellow", "red"]
+      },
+      {
+        "id": 4,
+        "title": "Step Failure Distribution (Top 5)",
+        "type": "graph",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "topk(5, sum by (step_id) (rate(selftest_step_failures_total{environment=~\"$environment\"}[5m])))",
+            "legendFormat": "{{step_id}}"
+          }
+        ],
+        "gridPos": {
+          "x": 6,
+          "y": 8,
+          "w": 18,
+          "h": 8
+        },
+        "bars": true,
+        "lines": false
+      },
+      {
+        "id": 5,
+        "title": "Run Duration Distribution (P50, P95, P99)",
+        "type": "graph",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(selftest_run_duration_seconds_bucket{environment=~\"$environment\"}[5m]))",
+            "legendFormat": "P50 - {{environment}}"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(selftest_run_duration_seconds_bucket{environment=~\"$environment\"}[5m]))",
+            "legendFormat": "P95 - {{environment}}"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(selftest_run_duration_seconds_bucket{environment=~\"$environment\"}[5m]))",
+            "legendFormat": "P99 - {{environment}}"
+          }
+        ],
+        "gridPos": {
+          "x": 0,
+          "y": 16,
+          "w": 24,
+          "h": 8
+        },
+        "yaxes": [
+          {
+            "label": "Duration",
+            "format": "s"
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 60,
+            "op": "gt",
+            "line": true,
+            "lineColor": "yellow"
+          },
+          {
+            "value": 120,
+            "colorMode": "critical",
+            "op": "gt",
+            "line": true
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Step Failures Heatmap",
+        "type": "heatmap",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum by (step_id, severity) (rate(selftest_step_failures_total{environment=~\"$environment\"}[1h]))",
+            "format": "time_series"
+          }
+        ],
+        "gridPos": {
+          "x": 0,
+          "y": 24,
+          "w": 16,
+          "h": 10
+        },
+        "dataFormat": "tsbuckets",
+        "color": {
+          "mode": "spectrum",
+          "colorScheme": "interpolateRdYlGn"
+        }
+      },
+      {
+        "id": 7,
+        "title": "Acceptance Criteria Pass Rates",
+        "type": "table",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "selftest_ac_pass_rate{environment=~\"$environment\"}",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "gridPos": {
+          "x": 16,
+          "y": 24,
+          "w": 8,
+          "h": 10
+        },
+        "styles": [
+          {
+            "pattern": "Time",
+            "type": "hidden"
+          },
+          {
+            "pattern": "ac_id",
+            "type": "string",
+            "alias": "AC ID"
+          },
+          {
+            "pattern": "Value",
+            "type": "number",
+            "alias": "Pass Rate (%)",
+            "decimals": 2,
+            "unit": "percent",
+            "thresholds": [95, 100],
+            "colorMode": "cell",
+            "colors": ["red", "yellow", "green"]
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Availability SLO",
+        "description": "Target: 99% of runs complete successfully over 30 days",
+        "type": "singlestat",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(rate(selftest_step_total{environment=\"prod\"}[30d])) / (sum(rate(selftest_step_total{environment=\"prod\"}[30d])) + sum(rate(selftest_step_failures_total{environment=\"prod\"}[30d])))",
+            "legendFormat": "Availability"
+          }
+        ],
+        "gridPos": {
+          "x": 0,
+          "y": 34,
+          "w": 8,
+          "h": 6
+        },
+        "format": "percentunit",
+        "gauge": {
+          "show": true,
+          "minValue": 0,
+          "maxValue": 1
+        },
+        "thresholds": "0.95,0.99",
+        "colors": ["red", "yellow", "green"],
+        "sparkline": {
+          "show": true,
+          "full": true
+        }
+      },
+      {
+        "id": 9,
+        "title": "Performance SLO",
+        "description": "Target: P95 run duration <= 120s over 30 days",
+        "type": "singlestat",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(selftest_run_duration_seconds_bucket{environment=\"prod\"}[30d]))",
+            "legendFormat": "P95 Duration"
+          }
+        ],
+        "gridPos": {
+          "x": 8,
+          "y": 34,
+          "w": 8,
+          "h": 6
+        },
+        "format": "s",
+        "gauge": {
+          "show": true,
+          "minValue": 0,
+          "maxValue": 150
+        },
+        "thresholds": "90,120",
+        "colors": ["green", "yellow", "red"],
+        "sparkline": {
+          "show": true,
+          "full": true
+        }
+      },
+      {
+        "id": 10,
+        "title": "Degradation SLO",
+        "description": "Target: No more than 3 repeated degradations per step within 24h",
+        "type": "singlestat",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "max by (step_id) (sum_over_time(selftest_degradations_total{environment=\"prod\"}[24h]))",
+            "legendFormat": "Max Degradations"
+          }
+        ],
+        "gridPos": {
+          "x": 16,
+          "y": 34,
+          "w": 8,
+          "h": 6
+        },
+        "gauge": {
+          "show": true,
+          "minValue": 0,
+          "maxValue": 5
+        },
+        "thresholds": "3,5",
+        "colors": ["green", "yellow", "red"],
+        "sparkline": {
+          "show": true,
+          "full": true
+        }
+      }
+    ]
+  }
+}

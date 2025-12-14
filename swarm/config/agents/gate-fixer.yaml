@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: gate-fixer
+flows:
+  - gate
+category: implementation
+color: green
+source: project/user
+short_role: "Mechanical fixes only (lint/format/docs) → gate_fix_summary.md."
+model: inherit

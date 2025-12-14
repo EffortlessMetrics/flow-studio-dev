@@ -1,0 +1,34 @@
+# Line ending normalization for cross-platform stability
+# Ensures compiled JS output is deterministic across Windows/Mac/Linux
+
+# General text files
+* text=auto
+
+# Flow Studio UI assets - enforce LF for consistent CI drift checks
+swarm/tools/flow_studio_ui/js/**/*.js text eol=lf
+swarm/tools/flow_studio_ui/js/**/*.d.ts text eol=lf
+swarm/tools/flow_studio_ui/css/**/*.css text eol=lf
+swarm/tools/flow_studio_ui/*.html text eol=lf
+
+# Keep GitHub diffs/language stats sane for generated output
+swarm/tools/flow_studio_ui/js/**/*.js linguist-generated
+swarm/tools/flow_studio_ui/js/**/*.d.ts linguist-generated
+
+# TypeScript sources
+*.ts text eol=lf
+*.tsx text eol=lf
+
+# Config files
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.toml text eol=lf
+
+# Markdown
+*.md text eol=lf
+
+# Shell scripts
+*.sh text eol=lf
+
+# Python
+*.py text eol=lf

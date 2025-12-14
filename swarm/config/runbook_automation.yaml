@@ -1,0 +1,101 @@
+# Runbook Automation Configuration
+#
+# Phase 1: GitHub Actions only (no external webhooks)
+#
+# This configuration controls the behavior of the selftest-auto-diagnostics
+# workflow and related automation.
+#
+# See: docs/designs/RUNBOOK_AUTOMATION_DESIGN.md
+
+version: "1.0"
+
+# Master enable/disable switch
+enabled: true
+
+# Trigger sources
+# Phase 1 only supports GitHub Actions triggers
+triggers:
+  # Trigger on selftest governance gate failure
+  on_selftest_failure: true
+
+  # Trigger on general CI failure (future)
+  on_ci_failure: false
+
+  # Allow manual dispatch via workflow_dispatch
+  manual_dispatch: true
+
+  # Allow API dispatch via repository_dispatch
+  api_dispatch: true
+
+# Actions to run when triggered
+actions:
+  # Run selftest-incident-pack to collect diagnostic tarball
+  incident_pack:
+    enabled: true
+    timeout_seconds: 300
+
+  # Run selftest-suggest-remediation to get fix suggestions
+  suggest_remediation:
+    enabled: true
+    timeout_seconds: 60
+
+  # Create GitHub issue for tracking (Phase 2)
+  create_issue:
+    enabled: false
+    labels:
+      - selftest
+      - automated
+      - incident
+    dedupe_window_hours: 24
+
+# Notification settings
+notifications:
+  # Upload artifacts to workflow run
+  upload_artifacts:
+    enabled: true
+    retention_days: 30
+
+  # Post comment to associated PR
+  post_pr_comment:
+    enabled: true
+    include_remediation_preview: true
+    max_preview_length: 2000
+
+  # Slack notification (Phase 2)
+  slack_notify:
+    enabled: false
+    channel: "#selftest-alerts"
+
+# Artifact settings
+artifacts:
+  # Maximum size for incident pack (MB)
+  max_size_mb: 100
+
+  # Files to include in diagnostics
+  include:
+    - selftest_incident_*.tar.gz
+    - remediation_suggestions.json
+    - remediation_suggestions.txt
+    - git_recent_commits.txt
+    - git_status.txt
+    - git_recent_changes.txt
+    - environment_info.txt
+
+# Runtime limits
+limits:
+  # Overall workflow timeout (minutes)
+  workflow_timeout_minutes: 15
+
+  # Maximum concurrent diagnostic runs (handled by GitHub)
+  max_concurrent: 1
+
+# Feature flags for gradual rollout
+features:
+  # Enable verbose logging
+  verbose_logging: false
+
+  # Enable experimental features
+  experimental: false
+
+  # Dry-run mode (collect but don't post)
+  dry_run: false

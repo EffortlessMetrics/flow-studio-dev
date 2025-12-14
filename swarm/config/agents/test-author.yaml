@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: test-author
+flows:
+  - build
+category: implementation
+color: green
+source: project/user
+short_role: "Write/update tests → tests/*, test_changes_summary.md."
+model: inherit

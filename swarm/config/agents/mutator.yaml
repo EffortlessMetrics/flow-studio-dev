@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: mutator
+flows:
+  - build
+category: verification
+color: blue
+source: project/user
+short_role: "Run mutation tests → mutation_report.md."
+model: inherit

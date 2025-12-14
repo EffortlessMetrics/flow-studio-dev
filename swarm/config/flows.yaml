@@ -1,0 +1,50 @@
+# swarm/config/flows.yaml
+# Canonical definition of SDLC flow ordering and metadata
+# All consumers (Python tools, TypeScript UI) derive from this file
+
+version: 1
+
+# Ordered list of flows in SDLC sequence
+flows:
+  - key: signal
+    index: 1
+    title: "Signal -> Spec"
+    short_title: "Signal"
+    description: "Raw input to problem statement, requirements, BDD scenarios, early risk assessment"
+
+  - key: plan
+    index: 2
+    title: "Spec -> Design"
+    short_title: "Plan"
+    description: "Requirements to ADR, contracts, observability spec, test/work plans, design validation"
+
+  - key: build
+    index: 3
+    title: "Plan -> Code"
+    short_title: "Build"
+    description: "Implement via adversarial microloops, build code and tests, self-verify, produce receipts"
+
+  - key: gate
+    index: 4
+    title: "Code -> Artifact"
+    short_title: "Gate"
+    description: "Pre-merge gate, audit receipts, check contracts/security/policy, recommend merge or bounce"
+
+  - key: deploy
+    index: 5
+    title: "Artifact -> Prod"
+    short_title: "Deploy"
+    description: "Move approved artifact to production, execute deployment, verify health, create audit trail"
+
+  - key: wisdom
+    index: 6
+    title: "Prod -> Wisdom"
+    short_title: "Wisdom"
+    description: "Analyze artifacts, detect regressions, extract learnings, close feedback loops"
+
+  - key: stepwise-demo
+    index: 7
+    title: "Stepwise Demo (Testing)"
+    short_title: "Stepwise"
+    description: "A 10-step demo flow for testing stepwise execution backends"
+    is_sdlc: false  # Demo flow, not part of core SDLC

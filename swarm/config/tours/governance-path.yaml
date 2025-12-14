@@ -1,0 +1,74 @@
+id: governance-path
+title: "Governance Path"
+description: "Trace how governance flows through the SDLC"
+steps:
+  - target:
+      type: step
+      flow: signal
+      step: critique_reqs
+    title: "Requirements Critique"
+    text: "Governance begins early: requirements-critic ensures requirements are testable and consistent before design work starts."
+    action: select_step
+
+  - target:
+      type: step
+      flow: build
+      step: critique_tests
+    title: "Test Critique"
+    text: "Test-critic validates tests against BDD scenarios. This catches specification drift before code is written."
+    action: select_step
+
+  - target:
+      type: step
+      flow: build
+      step: critique_code
+    title: "Code Critique"
+    text: "Code-critic reviews implementation against ADR and contracts. The adversarial loop catches issues early."
+    action: select_step
+
+  - target:
+      type: flow
+      flow: gate
+    title: "Gate Flow Overview"
+    text: "Flow 4 (Gate) is the pre-merge checkpoint. It audits receipts, checks contracts, runs security scans, and makes the merge decision."
+    action: select_flow
+
+  - target:
+      type: step
+      flow: gate
+      step: receipt
+    title: "Receipt Check"
+    text: "Receipt-checker verifies build_receipt.json exists and is complete. This is the audit trail from Build flow."
+    action: select_step
+
+  - target:
+      type: step
+      flow: gate
+      step: contract
+    title: "Contract Enforcement"
+    text: "Contract-enforcer checks API changes against interface_spec.md and api_contracts.yaml. Breaking changes are flagged."
+    action: select_step
+
+  - target:
+      type: step
+      flow: gate
+      step: security
+    title: "Security Scan"
+    text: "Security-scanner runs SAST and secret detection. Output: security_audit.md with findings and severity."
+    action: select_step
+
+  - target:
+      type: step
+      flow: gate
+      step: coverage
+    title: "Coverage Check"
+    text: "Coverage-enforcer verifies test coverage meets thresholds defined in the test strategy."
+    action: select_step
+
+  - target:
+      type: step
+      flow: gate
+      step: merge_decision
+    title: "Merge Decision"
+    text: "Merge-decider synthesizes all checks into a final verdict: MERGE, BOUNCE, or ESCALATE. This is the gate's decision artifact."
+    action: select_step

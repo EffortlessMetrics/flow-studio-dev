@@ -1,0 +1,55 @@
+# Active run artifacts (transient)
+/swarm/runs/
+/RUN_BASE/
+
+# Smoke test artifacts (receipt-backed verification)
+# Narrow to flowstudio_smoke/ to leave room for other artifacts (schemas, UX manifests)
+/artifacts/flowstudio_smoke/
+
+# Ad-hoc flow directories (should use swarm/runs/<run-id>/)
+/gate/
+
+# Test & selftest artifacts (root level and anywhere they might land)
+test_output.log
+selftest_metrics.jsonl
+selftest_degradations.log
+# Belt-and-suspenders: catch selftest reports in wrong locations
+swarm/tools/**/selftest_report.json
+
+# Build artifacts
+/target/
+**/*.rs.bk
+Cargo.lock
+*.bak
+*BUILD_CONTEXT_MANIFEST*
+BUILD_SUMMARY.md
+
+# Flow Studio UI
+# Contract A: commit compiled JS for "clone → run" reliability
+# TS sources are in src/, compiled JS is committed and drift-checked in CI
+swarm/tools/flow_studio_ui/node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Test & Coverage
+.pytest_cache/
+.benchmarks/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Playwright MCP artifacts
+.playwright-mcp/

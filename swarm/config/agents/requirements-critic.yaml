@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: requirements-critic
+flows:
+  - signal
+category: critic
+color: red
+source: project/user
+short_role: "Verify requirements are testable, consistent → requirements_critique.md."
+model: inherit

@@ -1,0 +1,311 @@
+# Selftest System Service Level Objectives (SLOs)
+# This file defines the three core SLOs for the selftest governance system
+# Format: Prometheus recording rules + Datadog SLO configuration
+
+version: "1.0"
+updated: "2025-12-01"
+
+# SLO 1: Availability SLO
+# Objective: 99% of selftest runs complete successfully over 30 days
+slos:
+  - name: selftest_availability_slo
+    description: "Percentage of selftest runs that complete successfully without kernel or critical failures"
+
+    objective:
+      target: 99.0  # 99% success rate
+      window: 30d   # 30-day rolling window
+
+    error_budget:
+      total: 1.0    # 1% error budget
+      remaining_calculation: "(100 - success_rate)"
+      burn_rate_alert_threshold: 2.0  # Alert if burning 2x faster than expected
+
+    metrics:
+      success_indicator:
+        type: counter
+        prometheus_query: |
+          sum(rate(selftest_step_total{environment="prod"}[30d]))
+        datadog_query: |
+          sum:selftest.step.total{environment:prod}.as_count()
+
+      failure_indicator:
+        type: counter
+        prometheus_query: |
+          sum(rate(selftest_step_failures_total{environment="prod",tier="kernel"}[30d]))
+        datadog_query: |
+          sum:selftest.step.failures.total{environment:prod,tier:kernel}.as_count()
+
+      sli_calculation:
+        prometheus_query: |
+          (
+            sum(rate(selftest_step_total{environment="prod"}[30d]))
+            - sum(rate(selftest_step_failures_total{environment="prod"}[30d]))
+          ) / sum(rate(selftest_step_total{environment="prod"}[30d])) * 100
+        datadog_query: |
+          (
+            sum:selftest.step.total{environment:prod}.as_count()
+            - sum:selftest.step.failures.total{environment:prod}.as_count()
+          ) / sum:selftest.step.total{environment:prod}.as_count() * 100
+
+    severity:
+      breach: critical
+      warning_threshold: 95.0  # Warn if below 95% (approaching breach)
+      action: page_oncall
+
+    alert_rules:
+      - name: SelftestAvailabilitySLOBreach
+        condition: "success_rate < 99.0"
+        duration: 5m
+        severity: critical
+        annotations:
+          summary: "Selftest availability SLO breached in prod"
+          description: "Success rate {{ $value }}% is below 99% target"
+          runbook: "https://github.com/org/repo/docs/runbooks/selftest-availability-slo.md"
+
+      - name: SelftestAvailabilitySLOWarning
+        condition: "success_rate < 95.0"
+        duration: 10m
+        severity: warning
+        annotations:
+          summary: "Selftest availability approaching SLO breach"
+          description: "Success rate {{ $value }}% is below 95% warning threshold"
+
+    remediation:
+      - "Check recent kernel failures with: make selftest-doctor"
+      - "Review degradation log: cat selftest_degradations.log"
+      - "Investigate infrastructure issues (CI/CD, deps, environment)"
+      - "If persistent: escalate to platform team"
+
+  # SLO 2: Performance SLO
+  # Objective: P95 run duration <= 120 seconds over 30 days
+  - name: selftest_performance_slo
+    description: "P95 selftest run duration must remain under 120 seconds to avoid CI/CD bottlenecks"
+
+    objective:
+      target: 120  # 120 seconds max for P95
+      window: 30d  # 30-day rolling window
+      percentile: 95
+
+    error_budget:
+      total: 30    # 30 seconds headroom (150s - 120s)
+      remaining_calculation: "(150 - p95_duration)"
+      burn_rate_alert_threshold: 1.5
+
+    metrics:
+      latency_indicator:
+        type: histogram
+        prometheus_query: |
+          histogram_quantile(0.95,
+            rate(selftest_run_duration_seconds_bucket{environment="prod"}[30d])
+          )
+        datadog_query: |
+          p95:selftest.run.duration_seconds{environment:prod}
+
+      sli_calculation:
+        prometheus_query: |
+          histogram_quantile(0.95,
+            rate(selftest_run_duration_seconds_bucket{environment="prod"}[30d])
+          )
+        datadog_query: |
+          p95:selftest.run.duration_seconds{environment:prod}
+
+    severity:
+      breach: high
+      warning_threshold: 90  # Warn if P95 > 90s
+      action: create_ticket
+
+    alert_rules:
+      - name: SelftestPerformanceSLOBreach
+        condition: "p95_duration > 120"
+        duration: 5m
+        severity: high
+        annotations:
+          summary: "Selftest performance SLO breached in prod"
+          description: "P95 duration {{ $value }}s exceeds 120s target"
+          runbook: "https://github.com/org/repo/docs/runbooks/selftest-performance-slo.md"
+
+      - name: SelftestPerformanceSLOWarning
+        condition: "p95_duration > 90"
+        duration: 10m
+        severity: warning
+        annotations:
+          summary: "Selftest performance approaching SLO breach"
+          description: "P95 duration {{ $value }}s exceeds 90s warning threshold"
+
+    remediation:
+      - "Identify slow steps with: make selftest --verbose"
+      - "Check for I/O contention or network latency"
+      - "Profile specific steps: make selftest --step <step-id> --profile"
+      - "Consider parallelizing independent steps"
+      - "Review step timeouts and retry logic"
+
+  # SLO 3: Degradation SLO
+  # Objective: No more than 3 repeated degradations for the same step within 24 hours
+  - name: selftest_degradation_slo
+    description: "Prevent repeated degradations from accumulating without remediation"
+
+    objective:
+      target: 3    # Max 3 degradations per step per 24h
+      window: 24h  # 24-hour window
+
+    error_budget:
+      total: 2     # Allow 2 additional degradations before breach
+      remaining_calculation: "(5 - degradation_count)"
+      burn_rate_alert_threshold: 1.0
+
+    metrics:
+      degradation_indicator:
+        type: counter
+        prometheus_query: |
+          max by (step_id) (
+            sum_over_time(selftest_degradations_total{environment="prod"}[24h])
+          )
+        datadog_query: |
+          max:selftest.degradations.total{environment:prod}.as_count().rollup(sum, 86400) by {step_id}
+
+      sli_calculation:
+        prometheus_query: |
+          max by (step_id) (
+            sum_over_time(selftest_degradations_total{environment="prod"}[24h])
+          )
+        datadog_query: |
+          max:selftest.degradations.total{environment:prod}.as_count().rollup(sum, 86400) by {step_id}
+
+    severity:
+      breach: high
+      warning_threshold: 2  # Warn if 2 degradations in 24h
+      action: create_ticket_and_notify
+
+    alert_rules:
+      - name: SelftestDegradationSLOBreach
+        condition: "max_degradations > 3"
+        duration: 0s  # Immediate alert
+        severity: high
+        annotations:
+          summary: "Selftest degradation SLO breached for step {{$labels.step_id}}"
+          description: "Step {{$labels.step_id}} has degraded {{ $value }} times in 24h (limit: 3)"
+          runbook: "https://github.com/org/repo/docs/runbooks/selftest-degradation-slo.md"
+
+      - name: SelftestDegradationSLOWarning
+        condition: "max_degradations > 2"
+        duration: 1h
+        severity: warning
+        annotations:
+          summary: "Selftest degradation approaching SLO breach"
+          description: "Step {{$labels.step_id}} has degraded {{ $value }} times in 24h"
+
+    remediation:
+      - "Review degradation log: cat selftest_degradations.log | grep <step-id>"
+      - "Check step-specific documentation in swarm/SELFTEST_SYSTEM.md"
+      - "Run: make selftest-doctor to diagnose harness vs service issues"
+      - "If governance step: verify agent files, flow specs, BDD scenarios"
+      - "Create GitHub issue to track persistent degradation patterns"
+
+# Prometheus Recording Rules
+# These rules pre-compute SLI values for efficient querying
+prometheus_recording_rules:
+  groups:
+    - name: selftest_slo_rules
+      interval: 1m
+      rules:
+        # Availability SLO
+        - record: selftest:availability:success_rate:30d
+          expr: |
+            (
+              sum(rate(selftest_step_total{environment="prod"}[30d]))
+              - sum(rate(selftest_step_failures_total{environment="prod"}[30d]))
+            ) / sum(rate(selftest_step_total{environment="prod"}[30d])) * 100
+          labels:
+            slo: availability
+            environment: prod
+
+        # Performance SLO
+        - record: selftest:performance:p95_duration:30d
+          expr: |
+            histogram_quantile(0.95,
+              rate(selftest_run_duration_seconds_bucket{environment="prod"}[30d])
+            )
+          labels:
+            slo: performance
+            environment: prod
+
+        # Degradation SLO
+        - record: selftest:degradation:max_count:24h
+          expr: |
+            max by (step_id) (
+              sum_over_time(selftest_degradations_total{environment="prod"}[24h])
+            )
+          labels:
+            slo: degradation
+            environment: prod
+
+# Datadog SLO Configuration (API format)
+datadog_slos:
+  - name: "Selftest Availability SLO"
+    type: metric
+    description: "99% of selftest runs complete successfully"
+    thresholds:
+      - timeframe: 30d
+        target: 99.0
+        warning: 95.0
+    monitor_ids: []  # Link to Datadog monitor IDs
+    tags:
+      - "team:platform"
+      - "service:selftest"
+      - "env:prod"
+
+  - name: "Selftest Performance SLO"
+    type: metric
+    description: "P95 run duration <= 120s"
+    thresholds:
+      - timeframe: 30d
+        target: 120
+        warning: 90
+    monitor_ids: []
+    tags:
+      - "team:platform"
+      - "service:selftest"
+      - "env:prod"
+
+  - name: "Selftest Degradation SLO"
+    type: metric
+    description: "No more than 3 repeated degradations per step in 24h"
+    thresholds:
+      - timeframe: 24h
+        target: 3
+        warning: 2
+    monitor_ids: []
+    tags:
+      - "team:platform"
+      - "service:selftest"
+      - "env:prod"
+
+# SLO Compliance Reporting
+reporting:
+  cadence: weekly
+  recipients:
+    - platform-team@example.com
+    - sre-oncall@example.com
+  format: markdown
+  template: |
+    # Selftest SLO Compliance Report
+
+    **Week of**: {{week_start}} - {{week_end}}
+
+    ## SLO Status
+
+    | SLO | Target | Actual | Status | Error Budget Remaining |
+    |-----|--------|--------|--------|------------------------|
+    | Availability | 99% | {{availability}}% | {{availability_status}} | {{availability_budget}}% |
+    | Performance | 120s | {{performance}}s | {{performance_status}} | {{performance_budget}}s |
+    | Degradation | <= 3/24h | {{degradation}} | {{degradation_status}} | {{degradation_budget}} |
+
+    ## Actions Required
+
+    {{actions}}
+
+    ## Trends
+
+    - Availability: {{availability_trend}}
+    - Performance: {{performance_trend}}
+    - Degradation: {{degradation_trend}}

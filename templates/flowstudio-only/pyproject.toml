@@ -1,0 +1,35 @@
+[project]
+name = "flowstudio"
+version = "0.1.0"
+description = "Visualize any YAML-defined flow graph"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+dependencies = [
+    "flask>=3.0.0",
+    "pyyaml>=6.0.0",
+]
+
+[project.optional-dependencies]
+fastapi = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.29.0",
+]
+production = [
+    "gunicorn>=22.0.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "httpx>=0.27.0",
+]
+
+[project.scripts]
+flowstudio = "flowstudio.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["flowstudio"]

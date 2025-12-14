@@ -1,0 +1,20 @@
+{
+  "engine": "claude-step",
+  "mode": "stub",
+  "provider": "anthropic",
+  "model": "claude-stub",
+  "step_id": "design_critique",
+  "flow_key": "plan",
+  "run_id": "run-20251209-093851-zhdxx7",
+  "agent_key": "design-critic",
+  "started_at": "2025-12-09T09:38:51.050708+00:00Z",
+  "completed_at": "2025-12-09T09:38:51.050776+00:00Z",
+  "duration_ms": 0,
+  "status": "succeeded",
+  "tokens": {
+    "prompt": 0,
+    "completion": 0,
+    "total": 0
+  },
+  "transcript_path": "llm/design_critique-design-critic-claude.jsonl"
+}

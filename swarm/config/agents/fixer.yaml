@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: fixer
+flows:
+  - build
+category: implementation
+color: green
+source: project/user
+short_role: "Apply targeted fixes from critics/mutation → fix_summary.md."
+model: inherit

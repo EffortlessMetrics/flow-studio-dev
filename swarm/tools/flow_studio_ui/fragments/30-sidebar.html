@@ -1,0 +1,48 @@
+  <aside id="sidebar" role="complementary" aria-label="Flow navigation" data-uiid="flow_studio.sidebar">
+    <div class="section-header">
+      <h2>Flows</h2>
+    </div>
+    <div style="margin-bottom: 12px;" data-uiid="flow_studio.sidebar.run_selector">
+      <label class="muted" style="font-size: 10px; display: block; margin-bottom: 4px;" for="run-selector">RUN</label>
+      <select id="run-selector" class="run-selector" style="width: 100%;" aria-label="Select run" data-uiid="flow_studio.sidebar.run_selector.select">
+        <option value="">Loading...</option>
+      </select>
+      <div id="compare-selector-wrapper" class="compare-selector-wrapper operator-only" data-uiid="flow_studio.sidebar.compare_selector">
+        <label class="muted" style="font-size: 10px; display: block; margin-bottom: 4px;" for="compare-selector">COMPARE WITH</label>
+        <select id="compare-selector" class="run-selector" style="width: 100%;" aria-label="Select comparison run" data-uiid="flow_studio.sidebar.compare_selector.select">
+          <option value="">None</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-bottom: 12px;" data-uiid="flow_studio.sidebar.view_toggle">
+      <label class="muted" style="font-size: 10px; display: block; margin-bottom: 4px;">VIEW</label>
+      <div class="view-toggle" role="group" aria-label="Graph view mode">
+        <button id="view-agents" class="active" title="Show steps and agents" aria-pressed="true" data-uiid="flow_studio.sidebar.view_toggle.agents">Steps/Agents</button>
+        <button id="view-artifacts" title="Show steps and artifacts" aria-pressed="false" data-uiid="flow_studio.sidebar.view_toggle.artifacts">Artifacts</button>
+      </div>
+    </div>
+    <div style="margin-bottom: 12px;" data-uiid="flow_studio.sidebar.backend_selector">
+      <label class="muted" style="font-size: 10px; display: block; margin-bottom: 4px;" for="backend-selector">BACKEND</label>
+      <select id="backend-selector" class="run-selector" style="width: 100%;" aria-label="Select execution backend" data-uiid="flow_studio.sidebar.backend_selector.select">
+        <option value="claude-harness">Claude CLI</option>
+        <option value="claude-step-orchestrator">Claude Stepwise</option>
+        <option value="gemini-step-orchestrator">Gemini Stepwise</option>
+      </select>
+    </div>
+    <nav id="flow-list" class="muted" role="navigation" aria-label="Flow list" data-uiid="flow_studio.sidebar.flow_list">Loading...</nav>
+    <!-- Run History Panel (collapsible) -->
+    <div class="run-history-section" data-uiid="flow_studio.sidebar.run_history">
+      <div class="section-header run-history-header" style="margin-top: 16px;">
+        <label class="muted" style="font-size: 10px;">RUN HISTORY</label>
+        <button id="run-history-toggle" class="collapse-toggle" aria-expanded="true" aria-controls="run-history-list" title="Toggle run history">▼</button>
+      </div>
+      <div id="run-history-filter" class="run-history-filter" data-uiid="flow_studio.sidebar.run_history.filter">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="example">Examples</button>
+        <button class="filter-btn" data-filter="active">Active</button>
+      </div>
+      <div id="run-history-list" class="run-history-list" role="list" aria-label="Run history" data-uiid="flow_studio.sidebar.run_history.list">
+        <div class="muted" style="padding: 8px; font-size: 11px;">Loading...</div>
+      </div>
+    </div>
+  </aside>

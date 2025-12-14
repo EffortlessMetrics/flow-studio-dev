@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: requirements-author
+flows:
+  - signal
+category: spec
+color: purple
+source: project/user
+short_role: "Write functional + non-functional requirements → requirements.md."
+model: inherit

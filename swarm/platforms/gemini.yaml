@@ -1,0 +1,22 @@
+name: gemini-code
+description: >
+  Google Gemini agent/command adapter profile (future platform).
+
+platform_key: gemini
+
+agents_dir: .gemini/agents
+commands_dir: .gemini/commands
+
+frontmatter:
+  allowed_keys:
+    - name
+    - description
+    - model
+    - color
+    - skills
+
+# Model mapping: tier -> concrete model string (flattened for simple YAML parser)
+model_tier_fast: gemini-flash
+model_tier_balanced: gemini-pro
+model_tier_deep: gemini-pro
+model_tier_fallback: gemini-2.5-pro

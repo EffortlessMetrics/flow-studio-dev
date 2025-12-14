@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "Flow Studio UX",
+  "version": "0.5.0-flowstudio",
+  "description": "UX manifest for Flow Studio - the authoritative index of specs, docs, tests, and tools for Claude/MCP UX review workflows.",
+  "specs": {
+    "description": "TypeScript source files that define the UX contract",
+    "files": [
+      "swarm/tools/flow_studio_ui/src/domain.ts",
+      "swarm/tools/flow_studio_ui/src/layout_spec.ts"
+    ]
+  },
+  "schemas": {
+    "description": "JSON schemas for structured data contracts",
+    "files": [
+      "swarm/schemas/ux_critique.schema.json"
+    ]
+  },
+  "docs": {
+    "description": "Documentation for Flow Studio UX and governance",
+    "files": [
+      "docs/FLOW_STUDIO.md",
+      "docs/FLOW_STUDIO_UX_HANDOVER.md",
+      "docs/MAINTAINING_FLOW_STUDIO.md"
+    ]
+  },
+  "tests": {
+    "description": "Test files that verify the UX contract",
+    "files": [
+      "tests/test_flow_studio_ui_ids.py",
+      "tests/test_flow_studio_sdk_path.py",
+      "tests/test_flow_studio_scenarios.py",
+      "tests/test_flow_studio_a11y.py"
+    ]
+  },
+  "tools": {
+    "description": "Python tools for UX review and validation",
+    "files": [
+      "swarm/tools/run_layout_review.py",
+      "swarm/tools/flow_studio_fastapi.py"
+    ]
+  },
+  "mcp_servers": {
+    "description": "MCP servers for Claude Code UX review workflows",
+    "servers": [
+      {
+        "name": "ux_spec",
+        "description": "Access Flow Studio UX manifest, layout spec, and critique schema",
+        "file": "swarm/tools/mcp_ux_spec.py",
+        "tools": ["get_ux_manifest", "get_layout_screens", "get_layout_screen", "get_all_uiids", "get_critique_schema"]
+      },
+      {
+        "name": "ux_review",
+        "description": "Capture and load per-screen UI review artifacts",
+        "file": "swarm/tools/mcp_ux_review.py",
+        "tools": ["run_layout_review", "list_review_runs", "get_screen_snapshot", "get_run_summary"]
+      },
+      {
+        "name": "ux_repo",
+        "description": "Read/write Flow Studio code and run UX tests",
+        "file": "swarm/tools/mcp_ux_repo.py",
+        "tools": ["read_file", "write_file", "run_ux_tests", "list_ui_files", "get_write_allowlist"]
+      }
+    ]
+  },
+  "api": {
+    "description": "API endpoints for UX tooling",
+    "endpoints": [
+      {
+        "path": "/api/layout_screens",
+        "method": "GET",
+        "description": "Get layout screen specifications for UX review"
+      },
+      {
+        "path": "/api/health",
+        "method": "GET",
+        "description": "Health check with capability flags"
+      },
+      {
+        "path": "/platform/status",
+        "method": "GET",
+        "description": "Governance status including selftest results"
+      }
+    ]
+  },
+  "sdk": {
+    "description": "Browser SDK methods exposed on window.__flowStudio",
+    "methods": [
+      {
+        "name": "getState",
+        "description": "Get current UI state snapshot"
+      },
+      {
+        "name": "getGraphState",
+        "description": "Get serialized graph state for snapshots"
+      },
+      {
+        "name": "getLayoutScreens",
+        "description": "Get all registered screens from layout spec"
+      },
+      {
+        "name": "getLayoutScreenById",
+        "description": "Get a specific screen by ID"
+      },
+      {
+        "name": "getAllKnownUIIDs",
+        "description": "Get all known UIIDs across all screens"
+      },
+      {
+        "name": "setActiveFlow",
+        "description": "Navigate to a specific flow"
+      },
+      {
+        "name": "selectStep",
+        "description": "Select a step by flow key and step ID"
+      },
+      {
+        "name": "selectAgent",
+        "description": "Select an agent by key"
+      },
+      {
+        "name": "clearSelection",
+        "description": "Clear the current selection"
+      },
+      {
+        "name": "qsByUiid",
+        "description": "Query element by typed UIID"
+      },
+      {
+        "name": "qsAllByUiidPrefix",
+        "description": "Query elements by UIID prefix"
+      }
+    ]
+  },
+  "workflows": {
+    "description": "Suggested workflows for UX review",
+    "items": [
+      {
+        "name": "layout-review",
+        "description": "Capture DOM/state/screenshots per screen",
+        "command": "uv run swarm/tools/run_layout_review.py"
+      },
+      {
+        "name": "ts-check",
+        "description": "Type-check TypeScript changes",
+        "command": "make ts-check"
+      },
+      {
+        "name": "ts-build",
+        "description": "Build TypeScript to JS",
+        "command": "make ts-build"
+      },
+      {
+        "name": "test-ux",
+        "description": "Run UX contract tests",
+        "command": "uv run pytest tests/test_flow_studio_ui_ids.py tests/test_flow_studio_sdk_path.py tests/test_flow_studio_a11y.py -v"
+      }
+    ]
+  }
+}

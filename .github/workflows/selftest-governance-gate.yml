@@ -1,0 +1,317 @@
+# Selftest Governance Gate
+#
+# This workflow enforces selftest governance by validating:
+# 1. AC (Acceptance Criteria) matrix alignment and freshness
+# 2. AC-related test suite (bijection, API contracts, traceability)
+# 3. Degradation system tests (schema, CLI, status coherence)
+# 4. Optional diagnostic checks for troubleshooting
+#
+# Exit behavior:
+# - Exit 1 (blocks merge): KERNEL or GOVERNANCE failures in steps 1-3
+# - Exit 0 (pass): All checks pass or only non-blocking warnings
+#
+# Runs on:
+# - All PRs touching selftest infrastructure or governance files
+# - Pushes to main (for monitoring)
+
+name: Selftest Governance Gate
+
+on:
+  pull_request:
+    paths:
+      # Core selftest infrastructure
+      - "swarm/tools/selftest*.py"
+      - "swarm/tools/check_selftest_ac_freshness.py"
+      - "swarm/config/selftest_config.py"
+
+      # Test files
+      - "tests/test_selftest_*.py"
+
+      # Governance documentation
+      - "docs/SELFTEST_*.md"
+      - "docs/AC_MATRIX.md"
+
+      # BDD features
+      - "features/selftest.feature"
+      - "features/selftest_*.feature"
+
+      # This workflow file itself
+      - ".github/workflows/selftest-governance-gate.yml"
+
+  push:
+    branches: [main]
+    paths:
+      - "swarm/tools/selftest*.py"
+      - "tests/test_selftest_*.py"
+      - "docs/SELFTEST_*.md"
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write  # For posting summary comments
+
+jobs:
+  selftest-governance-gate:
+    name: Selftest Governance Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      # ========================================
+      # Setup
+      # ========================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for AC freshness checks
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
+      - name: Install dependencies
+        run: uv sync --frozen --extra dev
+
+      # ========================================
+      # Pre-flight Validation
+      # ========================================
+
+      - name: Validate workflow preconditions
+        run: |
+          echo "::group::Pre-flight Validation"
+          echo "Checking preconditions for selftest governance gate..."
+
+          # Check required files exist
+          for file in uv.lock pyproject.toml swarm/tools/check_selftest_ac_freshness.py tests/test_selftest_ac_bijection.py; do
+            if [ ! -f "$file" ]; then
+              echo "❌ FATAL: Required file missing: $file"
+              exit 2
+            fi
+          done
+
+          # Validate pytest can discover tests
+          if ! uv run pytest --collect-only -q tests/test_selftest_*.py > /tmp/collect.log 2>&1; then
+            echo "❌ ERROR: pytest could not collect tests"
+            cat /tmp/collect.log
+            exit 2
+          fi
+
+          COLLECTED=$(grep -c "test_" /tmp/collect.log || echo "0")
+          if [ "$COLLECTED" -lt 20 ]; then
+            echo "⚠ WARNING: Only collected $COLLECTED tests (expected >50)"
+          fi
+
+          echo "✓ All preconditions validated"
+          echo "::endgroup::"
+
+      # ========================================
+      # Step 1: AC Matrix Alignment
+      # ========================================
+
+      - name: "[GOVERNANCE] Check AC Matrix Freshness"
+        id: ac_freshness
+        run: |
+          echo "::group::AC Matrix Freshness Check"
+          if uv run swarm/tools/check_selftest_ac_freshness.py; then
+            echo "status=pass" >> $GITHUB_OUTPUT
+            echo "✅ AC matrix is aligned with implementation"
+          else
+            echo "status=fail" >> $GITHUB_OUTPUT
+            echo "❌ AC matrix is out of sync with implementation"
+            exit 1
+          fi
+          echo "::endgroup::"
+        continue-on-error: false
+
+      # ========================================
+      # Step 2: AC-Related Test Suite
+      # ========================================
+
+      - name: "[GOVERNANCE] Run AC Tests (Bijection, API Contract, Traceability)"
+        id: ac_tests
+        run: |
+          echo "::group::AC Test Suite"
+          # Run all AC-related tests:
+          # - test_selftest_ac_bijection.py
+          # - test_selftest_ac_traceability.py
+          # - test_selftest_api_contract.py
+          # - test_selftest_api_contract_coherence.py
+
+          if uv run pytest \
+            tests/test_selftest_ac_bijection.py \
+            tests/test_selftest_ac_traceability.py \
+            tests/test_selftest_api_contract.py \
+            tests/test_selftest_api_contract_coherence.py \
+            -v --tb=short --color=yes; then
+            echo "status=pass" >> $GITHUB_OUTPUT
+            echo "✅ All AC tests passed"
+          else
+            echo "status=fail" >> $GITHUB_OUTPUT
+            echo "❌ AC tests failed (see logs above)"
+            exit 1
+          fi
+          echo "::endgroup::"
+        continue-on-error: false
+
+      # ========================================
+      # Step 3: Degradation System Tests
+      # ========================================
+
+      - name: "[GOVERNANCE] Run Degradation Tests (Schema, CLI, Status Coherence)"
+        id: degradation_tests
+        run: |
+          echo "::group::Degradation System Tests"
+          # Run all degradation-related tests:
+          # - test_selftest_degradation_schema_compliance.py
+          # - test_selftest_degradations_cli_contract.py
+          # - test_selftest_status_degradation_coherence.py
+          # - test_selftest_degradation_log.py
+
+          if uv run pytest \
+            tests/test_selftest_degradation_schema_compliance.py \
+            tests/test_selftest_degradations_cli_contract.py \
+            tests/test_selftest_status_degradation_coherence.py \
+            tests/test_selftest_degradation_log.py \
+            -v --tb=short --color=yes; then
+            echo "status=pass" >> $GITHUB_OUTPUT
+            echo "✅ All degradation tests passed"
+          else
+            echo "status=fail" >> $GITHUB_OUTPUT
+            echo "❌ Degradation tests failed (see logs above)"
+            exit 1
+          fi
+          echo "::endgroup::"
+        continue-on-error: false
+
+      # ========================================
+      # Step 4: Diagnostic Check (Informational)
+      # ========================================
+
+      - name: "[OPTIONAL] Run Selftest Doctor (Diagnostic)"
+        id: selftest_doctor
+        # This step is informational only and does not block merge
+        continue-on-error: true
+        run: |
+          echo "::group::Selftest Doctor Diagnostics"
+          uv run swarm/tools/selftest_doctor.py || true
+          echo "::endgroup::"
+
+      - name: Upload Diagnostic Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selftest-diagnostics
+          path: |
+            selftest_diagnostics.txt
+          retention-days: 7
+          if-no-files-found: ignore
+
+      # ========================================
+      # Summary Report
+      # ========================================
+
+      - name: Generate Summary
+        if: always()
+        run: |
+          echo "## Selftest Governance Gate Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # AC Freshness
+          if [ "${{ steps.ac_freshness.outputs.status }}" == "pass" ]; then
+            echo "✅ **AC Matrix Freshness**: PASS" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **AC Matrix Freshness**: FAIL" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # AC Tests
+          if [ "${{ steps.ac_tests.outputs.status }}" == "pass" ]; then
+            echo "✅ **AC Test Suite**: PASS" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **AC Test Suite**: FAIL" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Degradation Tests
+          if [ "${{ steps.degradation_tests.outputs.status }}" == "pass" ]; then
+            echo "✅ **Degradation Tests**: PASS" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Degradation Tests**: FAIL" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Overall status
+          if [ "${{ steps.ac_freshness.outputs.status }}" == "pass" ] && \
+             [ "${{ steps.ac_tests.outputs.status }}" == "pass" ] && \
+             [ "${{ steps.degradation_tests.outputs.status }}" == "pass" ]; then
+            echo "### ✅ All Governance Checks Passed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The selftest governance gate is **CLEAR**. Merge when ready." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Governance Gate BLOCKED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "One or more governance checks failed. Review the logs above and fix the issues before merging." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Diagnostic Tool**: \`make selftest-doctor\` output available in artifacts (informational only)" >> $GITHUB_STEP_SUMMARY
+
+      # ========================================
+      # Post Comment to PR (if applicable)
+      # ========================================
+
+      - name: Post PR Comment (if PR)
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const acFreshness = '${{ steps.ac_freshness.outputs.status }}';
+            const acTests = '${{ steps.ac_tests.outputs.status }}';
+            const degradationTests = '${{ steps.degradation_tests.outputs.status }}';
+
+            const allPassed = acFreshness === 'pass' && acTests === 'pass' && degradationTests === 'pass';
+
+            const statusIcon = (status) => status === 'pass' ? '✅' : '❌';
+
+            const body = `## Selftest Governance Gate Results
+
+            | Check | Status |
+            |-------|--------|
+            | AC Matrix Freshness | ${statusIcon(acFreshness)} ${acFreshness.toUpperCase()} |
+            | AC Test Suite | ${statusIcon(acTests)} ${acTests.toUpperCase()} |
+            | Degradation Tests | ${statusIcon(degradationTests)} ${degradationTests.toUpperCase()} |
+
+            ---
+
+            ${allPassed
+              ? '### ✅ All Governance Checks Passed\n\nThe selftest governance gate is **CLEAR**. Merge when ready.'
+              : '### ❌ Governance Gate BLOCKED\n\nOne or more governance checks failed. Review the workflow logs and fix the issues before merging.'}
+
+            ---
+
+            **Diagnostic Tool**: \`make selftest-doctor\` output available in workflow artifacts (informational only)`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });

@@ -1,0 +1,20 @@
+{
+  "engine": "claude-step",
+  "mode": "stub",
+  "provider": "anthropic",
+  "model": "claude-stub",
+  "step_id": "implement",
+  "flow_key": "build",
+  "run_id": "run-20251209-093851-zhdxx7",
+  "agent_key": "code-implementer",
+  "started_at": "2025-12-09T09:38:51.058956+00:00Z",
+  "completed_at": "2025-12-09T09:38:51.059033+00:00Z",
+  "duration_ms": 0,
+  "status": "succeeded",
+  "tokens": {
+    "prompt": 0,
+    "completion": 0,
+    "total": 0
+  },
+  "transcript_path": "llm/implement-code-implementer-claude.jsonl"
+}

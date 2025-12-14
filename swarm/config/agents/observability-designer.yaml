@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: observability-designer
+flows:
+  - plan
+category: spec
+color: purple
+source: project/user
+short_role: "Metrics, logs, traces, SLOs, alerts → observability_spec.md."
+model: inherit

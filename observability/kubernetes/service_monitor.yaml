@@ -1,0 +1,152 @@
+# ServiceMonitor CRD for Prometheus Operator
+# Automatically discovers and scrapes selftest metrics endpoints in Kubernetes
+#
+# Prerequisites:
+#   - Prometheus Operator installed (kube-prometheus-stack or similar)
+#   - Selftest service exposing metrics on port 9091
+#
+# Installation:
+#   kubectl apply -f service_monitor.yaml -n selftest
+#
+# Reference: docs/designs/OBSERVABILITY_PLUGINS_DESIGN.md
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: selftest
+  namespace: selftest
+  labels:
+    app: selftest
+    app.kubernetes.io/name: selftest
+    app.kubernetes.io/component: metrics
+    release: prometheus  # Required for kube-prometheus-stack discovery
+spec:
+  selector:
+    matchLabels:
+      app: selftest
+  namespaceSelector:
+    matchNames:
+      - selftest
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+      scheme: http
+      scrapeTimeout: 10s
+      # Optional: Add metric relabeling
+      metricRelabelings:
+        # Keep only selftest_ prefixed metrics
+        - sourceLabels: [__name__]
+          regex: "selftest_.*"
+          action: keep
+        # Add cluster label for multi-cluster setups
+        - targetLabel: cluster
+          replacement: "${CLUSTER_NAME:default}"
+      # Optional: Add endpoint relabeling
+      relabelings:
+        # Add pod name as label
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        # Add namespace as label
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+
+---
+# PrometheusRule CRD for recording and alert rules
+# Automatically loads rules into Prometheus via Prometheus Operator
+#
+# Installation:
+#   kubectl apply -f service_monitor.yaml -n selftest
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: selftest-rules
+  namespace: selftest
+  labels:
+    app: selftest
+    app.kubernetes.io/name: selftest
+    app.kubernetes.io/component: rules
+    release: prometheus  # Required for kube-prometheus-stack discovery
+    prometheus: kube-prometheus  # Alternative label for some setups
+spec:
+  groups:
+    # Recording Rules (pre-computed metrics)
+    - name: selftest_recording_rules
+      interval: 30s
+      rules:
+        # Pass rate over 5 minutes
+        - record: selftest:pass_rate:5m
+          expr: |
+            sum(rate(selftest_step_total{status="pass"}[5m])) /
+            sum(rate(selftest_step_total[5m]))
+          labels:
+            sli: availability
+
+        # Kernel failure rate
+        - record: selftest:kernel_failure_rate:5m
+          expr: |
+            sum(rate(selftest_step_total{tier="kernel",status="fail"}[5m])) /
+            sum(rate(selftest_step_total{tier="kernel"}[5m]))
+          labels:
+            sli: kernel_health
+
+        # P95 duration by step
+        - record: selftest:step_duration_p95:5m
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le, step_id) (rate(selftest_step_duration_seconds_bucket[5m]))
+            )
+          labels:
+            percentile: "95"
+
+        # Overall P95 run duration
+        - record: selftest:run_duration_p95:5m
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le) (rate(selftest_run_duration_seconds_bucket[5m]))
+            )
+          labels:
+            sli: performance
+
+        # Governance pass rate
+        - record: selftest:governance_pass_rate:5m
+          expr: |
+            sum(rate(selftest_step_total{tier="governance",status="pass"}[5m])) /
+            sum(rate(selftest_step_total{tier="governance"}[5m]))
+          labels:
+            sli: governance_health
+
+    # Alert Rules (SLO-based)
+    - name: selftest_slo_alerts
+      rules:
+        - alert: SelftestKernelFailure
+          expr: selftest:kernel_failure_rate:5m > 0.01
+          for: 5m
+          labels:
+            severity: critical
+            tier: kernel
+          annotations:
+            summary: "Selftest kernel failures detected"
+            description: "Kernel failure rate {{ $value | printf \"%.2f\" }}% exceeds 1% threshold"
+            runbook_url: "https://github.com/org/repo/docs/runbooks/selftest-kernel-failure.md"
+
+        - alert: SelftestGovernanceDegraded
+          expr: selftest:governance_pass_rate:5m < 0.95
+          for: 15m
+          labels:
+            severity: warning
+            tier: governance
+          annotations:
+            summary: "Selftest governance pass rate below 95%"
+            description: "Governance pass rate {{ $value | printf \"%.2f\" }}% is below threshold"
+
+        - alert: SelftestPerformanceSLOBreach
+          expr: selftest:run_duration_p95:5m > 120
+          for: 5m
+          labels:
+            severity: high
+            slo: performance
+          annotations:
+            summary: "Selftest performance SLO breached"
+            description: "P95 duration {{ $value | printf \"%.1f\" }}s exceeds 120s target"

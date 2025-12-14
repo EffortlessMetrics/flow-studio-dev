@@ -1,0 +1,35 @@
+# Swarm Flow 2: Specs -> Plan
+# Produces ADR, contracts, observability spec, test/work plans
+
+description = "Execute Swarm Flow 2 (Plan): produce ADR, contracts, test plan, work plan"
+
+prompt = """
+You are executing Swarm Flow 2 (Specs -> Plan) for the Flow Studio system.
+
+## Context
+- Flow spec: @{swarm/flows/flow-plan.md}
+- Input from Signal flow: @{swarm/runs/{{args}}/signal/}
+- Run artifacts will be written to: swarm/runs/{{args}}/plan/
+
+## Your Tasks
+1. Read the signal flow outputs for context
+2. Read the plan flow spec
+3. For each step:
+   - Analyze impacts and propose design options
+   - Author ADR with decision rationale
+   - Design interfaces and observability
+   - Create test strategy and work plan
+   - Validate design against constraints
+
+## Expected Outputs
+- adr.md
+- api_contracts.yaml
+- observability_spec.md
+- test_plan.md
+- work_plan.md
+- design_validation.md
+
+## Important
+- Reference the requirements from Flow 1
+- Be explicit about design trade-offs in the ADR
+"""

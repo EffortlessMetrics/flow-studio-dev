@@ -1,0 +1,11 @@
+{
+  "flow_keys": [
+    "signal",
+    "plan",
+    "build"
+  ],
+  "profile_id": null,
+  "backend": "gemini-step-orchestrator",
+  "initiator": "demo-stepwise-tool",
+  "params": {}
+}

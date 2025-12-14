@@ -1,0 +1,5 @@
+{
+  "subtask": "health_endpoint",
+  "files": ["src/router.rs", "src/handlers/health.rs", "tests/health_check_tests.rs"],
+  "tests": ["tests/health_check_tests.rs"]
+}

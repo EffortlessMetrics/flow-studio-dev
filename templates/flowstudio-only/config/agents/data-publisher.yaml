@@ -1,0 +1,7 @@
+# Data publisher agent
+
+key: data-publisher
+category: implementation
+color: green
+short_role: "Publish processed data to output destinations."
+model: inherit

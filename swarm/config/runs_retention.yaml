@@ -1,0 +1,64 @@
+# Runs Retention Configuration
+# ============================
+# Controls lifecycle management for run artifacts in swarm/runs/.
+#
+# Environment variable overrides (highest precedence):
+#   SWARM_RUNS_RETENTION_DAYS - Override default_retention_days
+#   SWARM_RUNS_MAX_COUNT - Override max_count
+#   SWARM_RUNS_DRY_RUN - Set to "1" to enable dry-run mode
+
+version: "1.0"
+
+# Global retention policy
+policy:
+  enabled: true
+  default_retention_days: 30  # Keep runs for this many days
+  strict_mode: false          # If true, fail on errors; if false, skip and continue
+
+# Runs cleanup rules
+runs:
+  max_count: 300              # Keep at most N most recent runs
+  max_total_size_mb: 2000     # Soft limit on swarm/runs/ size (informational)
+
+  # Patterns to preserve (never delete)
+  preserve:
+    # Named runs to always keep (exact match)
+    named_runs:
+      - "demo-health-check"
+      - "demo-run"
+
+    # Prefix patterns to preserve
+    prefixes:
+      - "stepwise-"           # Stepwise demo runs
+      - "baseline-"           # Baseline snapshots
+
+    # Tag-based preservation
+    tags:
+      - "pinned"              # Don't delete runs tagged 'pinned'
+      - "golden"              # Golden examples
+
+  # Example runs are always preserved (from swarm/examples/)
+  preserve_examples: true
+
+# Per-flow retention overrides
+# (Runs are retained if ANY flow matches the longer retention)
+flows:
+  signal:
+    retention_days: 30
+  plan:
+    retention_days: 30
+  build:
+    retention_days: 30
+  gate:
+    retention_days: 60        # Keep audit trails longer
+  deploy:
+    retention_days: 60        # Keep deployment records longer
+  wisdom:
+    retention_days: 60        # Keep learnings longer
+
+# Feature flags
+features:
+  dry_run: false              # Show what would be deleted without deleting
+  log_deletions: true         # Log each deletion
+  archive_before_delete: false  # Future: archive to tarball before delete
+  quarantine_corrupt: true    # Move corrupt runs to _corrupt/ instead of deleting

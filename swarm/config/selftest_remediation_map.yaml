@@ -1,0 +1,88 @@
+# Selftest Remediation Pattern Map
+#
+# This file defines safe, low-ambiguity patterns for automated remediation suggestions.
+# The suggestion engine reads this map and matches degradation log entries against these patterns.
+#
+# Design Principle: Read-only suggestions, not auto-execution.
+# Each pattern provides actionable commands for humans to review and execute.
+
+version: "1.0.0"
+
+remediation_patterns:
+  # Pattern 1: Agent/Skill not found in registry
+  - id: agent-not-found
+    error_pattern: "Agent .* not found in registry"
+    severity: governance
+    suggested_commands:
+      - make gen-adapters
+      - make validate-swarm
+    rationale: "Config is out of sync; regeneration fixes bijection between AGENTS.md and config YAML"
+
+  - id: skill-not-found
+    error_pattern: "Skill .* not found"
+    severity: governance
+    suggested_commands:
+      - make gen-adapters
+      - make validate-swarm
+    rationale: "Skill reference in agent frontmatter doesn't match available skills; regeneration updates adapters"
+
+  # Pattern 2: Test coverage below threshold
+  - id: coverage-below-threshold
+    error_pattern: "Coverage.*below.*target|Coverage.*\\d+%.*target.*\\d+%"
+    severity: optional
+    suggested_commands:
+      - make selftest-coverage-report
+      - uv run pytest --cov
+    rationale: "New code needs test coverage; these commands help identify gaps and generate coverage reports"
+
+  # Pattern 3: AC matrix freshness stale
+  - id: ac-matrix-stale
+    error_pattern: "AC matrix.*stale|Acceptance criteria.*not updated"
+    severity: governance
+    suggested_commands:
+      - uv run swarm/tools/check_selftest_ac_freshness.py --update
+    rationale: "Spec changed but tests didn't; update tool automates alignment between acceptance criteria and test coverage"
+
+  # Pattern 4: YAML frontmatter errors
+  - id: yaml-frontmatter-error
+    error_pattern: "YAML parse error|frontmatter not terminated|invalid YAML"
+    severity: governance
+    suggested_commands:
+      - make validate-swarm
+    rationale: "Agent or skill frontmatter has syntax errors; validator provides detailed line numbers and fix hints"
+
+  # Pattern 5: Color mismatch (role family vs frontmatter)
+  - id: color-mismatch
+    error_pattern: "color .* does not match expected color .* for role family"
+    severity: governance
+    suggested_commands:
+      - make gen-adapters
+      - make validate-swarm
+    rationale: "Agent color doesn't align with role family; regeneration from config enforces canonical color scheme"
+
+  # Pattern 6: Hardcoded RUN_BASE paths
+  - id: hardcoded-run-base
+    error_pattern: "contains hardcoded path|should use RUN_BASE placeholder"
+    severity: governance
+    suggested_commands:
+      - make validate-swarm
+    rationale: "Flow spec uses hardcoded paths instead of RUN_BASE/<flow>/ placeholders; validator pinpoints exact locations"
+
+  # Pattern 7: Python linting issues (ruff)
+  - id: ruff-lint-error
+    error_pattern: "ruff.*failed|E\\d{3}|F\\d{3}|W\\d{3}"
+    severity: kernel
+    suggested_commands:
+      - make lint
+      - uv run ruff check --fix
+    rationale: "Python code has linting issues; ruff can auto-fix many violations (imports, formatting, etc.)"
+
+  # Pattern 8: Git status unclean
+  - id: git-unclean
+    error_pattern: "git status.*not clean|uncommitted changes"
+    severity: governance
+    suggested_commands:
+      - git status
+      - git add -p
+      - git commit -m "fix: address selftest issues"
+    rationale: "Working tree has uncommitted changes; review and commit before re-running selftest"

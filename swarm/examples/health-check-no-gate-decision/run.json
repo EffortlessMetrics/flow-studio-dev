@@ -1,0 +1,5 @@
+{
+  "title": "Health Check - No Gate Decision",
+  "description": "Gate flow incomplete: individual checks passed but merge_recommendation.md never written.",
+  "tags": ["scenario", "incomplete-flow", "missing-decision"]
+}

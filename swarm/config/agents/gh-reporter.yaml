@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: gh-reporter
+flows:
+  - all
+category: reporter
+color: pink
+source: project/user
+short_role: "Post summaries to GitHub issues/PRs at flow boundaries."
+model: inherit

@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: bdd-author
+flows:
+  - signal
+category: spec
+color: purple
+source: project/user
+short_role: "Turn requirements into BDD scenarios → features/*.feature."
+model: inherit

@@ -1,0 +1,26 @@
+{
+  "engine": "claude-step",
+  "mode": "stub",
+  "provider": "anthropic",
+  "model": "claude-stub",
+  "step_id": "critique_reqs",
+  "flow_key": "signal",
+  "run_id": "run-20251209-102043-n7mtao",
+  "agent_key": "requirements-critic",
+  "started_at": "2025-12-09T10:20:43.232338+00:00Z",
+  "completed_at": "2025-12-09T10:20:43.232399+00:00Z",
+  "duration_ms": 0,
+  "status": "succeeded",
+  "tokens": {
+    "prompt": 0,
+    "completion": 0,
+    "total": 0
+  },
+  "transcript_path": "llm/critique_reqs-requirements-critic-claude.jsonl",
+  "routing": {
+    "loop_iteration": 3,
+    "max_iterations": 3,
+    "decision": "advance",
+    "reason": "max_iterations_reached:3"
+  }
+}

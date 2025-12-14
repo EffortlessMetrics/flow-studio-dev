@@ -1,0 +1,661 @@
+"""
+storage.py - Disk I/O helpers for run metadata and events.
+
+This module provides functions for persisting and loading run data from disk.
+The storage layout is:
+
+    swarm/runs/
+      <run_id>/
+        meta.json          # RunSummary serialized
+        spec.json          # RunSpec serialized
+        events.jsonl       # newline-delimited RunEvent objects
+        <flow_key>/        # existing artifact directories (signal/, plan/, etc.)
+
+Usage:
+    from swarm.runtime.storage import (
+        RUNS_DIR,
+        get_run_path, run_exists, create_run_dir,
+        write_spec, read_spec,
+        write_summary, read_summary, update_summary,
+        append_event, read_events,
+        list_runs, discover_legacy_runs,
+    )
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+import tempfile
+import threading
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from .types import (
+    RunEvent,
+    RunId,
+    RunSpec,
+    RunSummary,
+    run_event_from_dict,
+    run_event_to_dict,
+    run_spec_from_dict,
+    run_spec_to_dict,
+    run_summary_from_dict,
+    run_summary_to_dict,
+)
+
+# Module logger
+logger = logging.getLogger(__name__)
+
+# Default directories
+RUNS_DIR = Path(__file__).parent.parent / "runs"
+EXAMPLES_DIR = Path(__file__).parent.parent / "examples"
+
+# File names
+META_FILE = "meta.json"
+SPEC_FILE = "spec.json"
+EVENTS_FILE = "events.jsonl"
+LEGACY_META_FILE = "run.json"  # Old-style optional metadata
+
+# -----------------------------------------------------------------------------
+# Per-run locking for thread safety
+# -----------------------------------------------------------------------------
+# Backends execute runs in background threads, and update_summary is a
+# read-modify-write operation. Without locking, concurrent updates can cause
+# lost updates. This provides in-process locking; cross-process locking is
+# out of scope for now.
+
+_RUN_LOCKS: Dict[RunId, threading.Lock] = {}
+_RUN_LOCKS_LOCK = threading.Lock()
+
+
+def _get_run_lock(run_id: RunId) -> threading.Lock:
+    """Get or create a lock for a specific run ID.
+
+    Thread-safe lock registry for per-run synchronization.
+
+    Args:
+        run_id: The unique run identifier.
+
+    Returns:
+        A threading.Lock specific to this run ID.
+    """
+    with _RUN_LOCKS_LOCK:
+        lock = _RUN_LOCKS.get(run_id)
+        if lock is None:
+            lock = threading.Lock()
+            _RUN_LOCKS[run_id] = lock
+        return lock
+
+
+# -----------------------------------------------------------------------------
+# Atomic File I/O Helpers
+# -----------------------------------------------------------------------------
+
+
+def _atomic_write_json(path: Path, data: Any, indent: int = 2) -> None:
+    """Write JSON data to a file atomically.
+
+    Uses a temporary file + os.replace pattern to ensure atomicity.
+    This prevents partial writes if the process is killed mid-write.
+
+    Args:
+        path: Destination file path.
+        data: JSON-serializable data.
+        indent: JSON indentation level.
+    """
+    parent = path.parent
+    parent.mkdir(parents=True, exist_ok=True)
+
+    # Write to temp file in same directory (ensures same filesystem for rename)
+    fd, tmp_path = tempfile.mkstemp(
+        suffix=".tmp",
+        prefix=path.name + ".",
+        dir=parent,
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=indent, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())  # Ensure data is on disk
+
+        # Atomic rename (POSIX guarantees)
+        os.replace(tmp_path, path)
+    except Exception:
+        # Clean up temp file on failure
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def _load_json_safe(path: Path, run_id: str, file_type: str = "file") -> Optional[Dict[str, Any]]:
+    """Load JSON file with graceful error handling.
+
+    Returns None on parse errors instead of raising, to allow callers
+    to handle corrupt files gracefully.
+
+    Args:
+        path: Path to JSON file.
+        run_id: Run identifier for logging.
+        file_type: Description of file type for logging (e.g., "summary", "spec").
+
+    Returns:
+        Parsed JSON dict, or None if file doesn't exist or is corrupt.
+    """
+    if not path.exists():
+        return None
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except json.JSONDecodeError as e:
+        logger.warning(
+            "Corrupt %s for run '%s' at %s: %s (marking as corrupt)",
+            file_type, run_id, path, e
+        )
+        return None
+    except (OSError, IOError) as e:
+        logger.warning(
+            "Failed to read %s for run '%s' at %s: %s",
+            file_type, run_id, path, e
+        )
+        return None
+
+
+# -----------------------------------------------------------------------------
+# Path Helpers
+# -----------------------------------------------------------------------------
+
+
+def get_run_path(run_id: RunId, runs_dir: Path = RUNS_DIR) -> Path:
+    """Get the path for a run directory.
+
+    Args:
+        run_id: The unique run identifier.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        Path to the run directory.
+
+    Example:
+        >>> get_run_path("run-20251208-143022-abc123")
+        PosixPath('/path/to/swarm/runs/run-20251208-143022-abc123')
+    """
+    return runs_dir / run_id
+
+
+def find_run_path(run_id: RunId) -> Optional[Path]:
+    """Find a run's path, checking both runs/ and examples/ directories.
+
+    Checks examples first (committed/curated), then active runs.
+
+    Args:
+        run_id: The unique run identifier.
+
+    Returns:
+        Path to the run directory, or None if not found.
+    """
+    # Check examples first (committed, curated)
+    example_path = EXAMPLES_DIR / run_id
+    if example_path.exists() and example_path.is_dir():
+        return example_path
+
+    # Check active runs
+    runs_path = RUNS_DIR / run_id
+    if runs_path.exists() and runs_path.is_dir():
+        return runs_path
+
+    return None
+
+
+def get_run_type(run_id: RunId) -> Optional[str]:
+    """Determine the type of a run (example or active).
+
+    Args:
+        run_id: The unique run identifier.
+
+    Returns:
+        "example" if in examples/, "active" if in runs/, None if not found.
+    """
+    example_path = EXAMPLES_DIR / run_id
+    if example_path.exists() and example_path.is_dir():
+        return "example"
+
+    runs_path = RUNS_DIR / run_id
+    if runs_path.exists() and runs_path.is_dir():
+        return "active"
+
+    return None
+
+
+def run_exists(run_id: RunId, runs_dir: Path = RUNS_DIR) -> bool:
+    """Check if a run exists on disk.
+
+    A run is considered to exist if its meta.json file exists.
+
+    Args:
+        run_id: The unique run identifier.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        True if the run exists (has meta.json), False otherwise.
+    """
+    run_path = get_run_path(run_id, runs_dir)
+    return (run_path / META_FILE).exists()
+
+
+def create_run_dir(run_id: RunId, runs_dir: Path = RUNS_DIR) -> Path:
+    """Create the run directory structure.
+
+    Creates the run directory if it doesn't exist. Does not create
+    flow subdirectories (those are created by agents as needed).
+
+    Args:
+        run_id: The unique run identifier.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        Path to the created run directory.
+
+    Example:
+        >>> path = create_run_dir("run-20251208-143022-abc123")
+        >>> path.exists()
+        True
+    """
+    run_path = get_run_path(run_id, runs_dir)
+    run_path.mkdir(parents=True, exist_ok=True)
+    return run_path
+
+
+# -----------------------------------------------------------------------------
+# RunSpec I/O
+# -----------------------------------------------------------------------------
+
+
+def write_spec(run_id: RunId, spec: RunSpec, runs_dir: Path = RUNS_DIR) -> Path:
+    """Write RunSpec to spec.json atomically.
+
+    Uses atomic write (temp file + rename) to prevent partial writes.
+
+    Args:
+        run_id: The unique run identifier.
+        spec: The RunSpec to persist.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        Path to the written spec.json file.
+    """
+    run_path = create_run_dir(run_id, runs_dir)
+    spec_path = run_path / SPEC_FILE
+
+    data = run_spec_to_dict(spec)
+    _atomic_write_json(spec_path, data)
+
+    return spec_path
+
+
+def read_spec(run_id: RunId, runs_dir: Path = RUNS_DIR) -> Optional[RunSpec]:
+    """Read RunSpec from spec.json with graceful error handling.
+
+    Args:
+        run_id: The unique run identifier.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        The RunSpec if it exists and is valid, None otherwise.
+    """
+    run_path = get_run_path(run_id, runs_dir)
+    spec_path = run_path / SPEC_FILE
+
+    data = _load_json_safe(spec_path, run_id, "spec")
+    if data is None:
+        return None
+
+    try:
+        return run_spec_from_dict(data)
+    except (KeyError, TypeError) as e:
+        logger.warning("Invalid spec data for run '%s' at %s: %s", run_id, spec_path, e)
+        return None
+
+
+# -----------------------------------------------------------------------------
+# RunSummary I/O
+# -----------------------------------------------------------------------------
+
+
+def write_summary(run_id: RunId, summary: RunSummary, runs_dir: Path = RUNS_DIR) -> Path:
+    """Write RunSummary to meta.json atomically.
+
+    Uses atomic write (temp file + rename) to prevent partial writes.
+
+    Args:
+        run_id: The unique run identifier.
+        summary: The RunSummary to persist.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        Path to the written meta.json file.
+    """
+    run_path = create_run_dir(run_id, runs_dir)
+    meta_path = run_path / META_FILE
+
+    data = run_summary_to_dict(summary)
+    _atomic_write_json(meta_path, data)
+
+    return meta_path
+
+
+def read_summary(run_id: RunId, runs_dir: Path = RUNS_DIR) -> Optional[RunSummary]:
+    """Read RunSummary from meta.json with graceful error handling.
+
+    Returns None for missing or corrupt files, allowing callers to
+    skip or quarantine bad runs.
+
+    Args:
+        run_id: The unique run identifier.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        The RunSummary if it exists and is valid, None otherwise.
+    """
+    run_path = get_run_path(run_id, runs_dir)
+    meta_path = run_path / META_FILE
+
+    data = _load_json_safe(meta_path, run_id, "summary")
+    if data is None:
+        return None
+
+    try:
+        return run_summary_from_dict(data)
+    except (KeyError, TypeError) as e:
+        logger.warning("Invalid summary data for run '%s' at %s: %s", run_id, meta_path, e)
+        return None
+
+
+def update_summary(run_id: RunId, updates: Dict[str, Any], runs_dir: Path = RUNS_DIR) -> RunSummary:
+    """Partial update of RunSummary fields.
+
+    Reads the existing summary, applies updates, and writes back.
+    Only updates fields that are present in the updates dict.
+
+    This function is thread-safe via per-run locking to prevent lost updates
+    when multiple threads update the same run concurrently.
+
+    Args:
+        run_id: The unique run identifier.
+        updates: Dictionary of fields to update. Supports top-level fields
+                 like "status", "sdlc_status", "error", "completed_at", etc.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        The updated RunSummary.
+
+    Raises:
+        FileNotFoundError: If the run's meta.json doesn't exist.
+
+    Example:
+        >>> update_summary("run-123", {"status": "succeeded", "completed_at": "2025-01-08T12:00:00Z"})
+    """
+    lock = _get_run_lock(run_id)
+    with lock:
+        summary = read_summary(run_id, runs_dir)
+        if summary is None:
+            raise FileNotFoundError(f"Run not found: {run_id}")
+
+        # Convert to dict, apply updates, convert back
+        data = run_summary_to_dict(summary)
+
+        for key, value in updates.items():
+            if key in data:
+                data[key] = value
+
+        updated_summary = run_summary_from_dict(data)
+        write_summary(run_id, updated_summary, runs_dir)
+
+        return updated_summary
+
+
+# -----------------------------------------------------------------------------
+# RunEvent I/O (JSONL - newline-delimited JSON)
+# -----------------------------------------------------------------------------
+
+
+def append_event(run_id: RunId, event: RunEvent, runs_dir: Path = RUNS_DIR) -> None:
+    """Append a RunEvent to events.jsonl.
+
+    Uses JSONL (newline-delimited JSON) format for append-friendly streaming.
+    Creates the file if it doesn't exist.
+
+    This function is thread-safe via per-run locking to ensure atomic appends
+    when multiple threads emit events for the same run.
+
+    Args:
+        run_id: The unique run identifier.
+        event: The RunEvent to append.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+    """
+    lock = _get_run_lock(run_id)
+    with lock:
+        run_path = create_run_dir(run_id, runs_dir)
+        events_path = run_path / EVENTS_FILE
+
+        try:
+            data = run_event_to_dict(event)
+            line = json.dumps(data, ensure_ascii=False)
+
+            with open(events_path, "a", encoding="utf-8") as f:
+                f.write(line + "\n")
+                f.flush()  # Ensure data reaches OS buffer
+        except (OSError, IOError) as e:
+            logger.warning(
+                "Failed to append event for run '%s' at %s: %s",
+                run_id,
+                events_path,
+                e,
+            )
+            # Don't re-raise - event logging is non-critical
+        except (TypeError, ValueError) as e:
+            logger.warning(
+                "Failed to serialize event for run '%s': %s",
+                run_id,
+                e,
+            )
+            # Don't re-raise - malformed events shouldn't crash the run
+
+
+def read_events(run_id: RunId, runs_dir: Path = RUNS_DIR) -> List[RunEvent]:
+    """Read all events from events.jsonl.
+
+    Args:
+        run_id: The unique run identifier.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        List of RunEvent objects in chronological order.
+        Returns empty list if file doesn't exist or is empty.
+    """
+    run_path = get_run_path(run_id, runs_dir)
+    events_path = run_path / EVENTS_FILE
+
+    if not events_path.exists():
+        return []
+
+    events: List[RunEvent] = []
+    try:
+        with open(events_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                    events.append(run_event_from_dict(data))
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    # Skip malformed lines
+                    continue
+    except OSError:
+        return []
+
+    return events
+
+
+# -----------------------------------------------------------------------------
+# Run Listing
+# -----------------------------------------------------------------------------
+
+
+def list_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
+    """List all run IDs that have meta.json files.
+
+    Only returns runs that have been properly initialized with a meta.json.
+    Sorted by run ID (which includes timestamp for chronological ordering).
+
+    Args:
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        List of run IDs with meta.json files, sorted alphabetically.
+    """
+    if not runs_dir.exists():
+        return []
+
+    run_ids: List[RunId] = []
+    for entry in runs_dir.iterdir():
+        if entry.is_dir() and (entry / META_FILE).exists():
+            run_ids.append(entry.name)
+
+    return sorted(run_ids)
+
+
+def discover_legacy_runs(runs_dir: Path = RUNS_DIR) -> List[RunId]:
+    """Find runs that have flow artifacts but no meta.json (legacy runs).
+
+    Legacy runs are directories under runs/ that contain flow subdirectories
+    (signal/, plan/, build/, etc.) but lack a meta.json file. These were
+    created before the RunService was introduced.
+
+    Args:
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        List of run IDs that appear to be legacy runs.
+    """
+    if not runs_dir.exists():
+        return []
+
+    # Known flow keys that indicate a valid run directory
+    flow_keys = {"signal", "plan", "build", "gate", "deploy", "wisdom"}
+
+    legacy_runs: List[RunId] = []
+    for entry in runs_dir.iterdir():
+        if not entry.is_dir():
+            continue
+
+        # Skip if already has meta.json (not legacy)
+        if (entry / META_FILE).exists():
+            continue
+
+        # Check if any flow subdirectory exists
+        has_flow_artifacts = any(
+            (entry / flow_key).is_dir() for flow_key in flow_keys
+        )
+
+        if has_flow_artifacts:
+            legacy_runs.append(entry.name)
+
+    return sorted(legacy_runs)
+
+
+def discover_example_runs() -> List[RunId]:
+    """Find curated example runs in swarm/examples/.
+
+    Example runs are committed to the repo for teaching/demonstration.
+    They are always treated as legacy (no meta.json expected).
+
+    Returns:
+        List of run IDs from examples/, sorted alphabetically.
+    """
+    if not EXAMPLES_DIR.exists():
+        return []
+
+    # Known flow keys that indicate a valid run directory
+    flow_keys = {"signal", "plan", "build", "gate", "deploy", "wisdom"}
+
+    example_runs: List[RunId] = []
+    for entry in EXAMPLES_DIR.iterdir():
+        if not entry.is_dir() or entry.name.startswith("."):
+            continue
+
+        # Check if any flow subdirectory exists
+        has_flow_artifacts = any(
+            (entry / flow_key).is_dir() for flow_key in flow_keys
+        )
+
+        if has_flow_artifacts:
+            example_runs.append(entry.name)
+
+    return sorted(example_runs)
+
+
+def list_all_runs(include_examples: bool = True) -> List[Dict[str, Any]]:
+    """List all known runs with their metadata.
+
+    Returns unified list of runs from both runs/ and examples/ directories,
+    with type and basic metadata for each.
+
+    Args:
+        include_examples: Whether to include example runs. Defaults to True.
+
+    Returns:
+        List of dicts with run_id, run_type, path, and has_meta fields.
+        Sorted with examples first, then active runs alphabetically.
+    """
+    results: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+
+    # Examples first (curated, committed)
+    if include_examples:
+        for run_id in discover_example_runs():
+            if run_id in seen:
+                continue
+            seen.add(run_id)
+            run_path = EXAMPLES_DIR / run_id
+            results.append({
+                "run_id": run_id,
+                "run_type": "example",
+                "path": str(run_path),
+                "has_meta": (run_path / META_FILE).exists(),
+            })
+
+    # New-style runs with meta.json
+    for run_id in list_runs():
+        if run_id in seen:
+            continue
+        seen.add(run_id)
+        run_path = RUNS_DIR / run_id
+        results.append({
+            "run_id": run_id,
+            "run_type": "active",
+            "path": str(run_path),
+            "has_meta": True,
+        })
+
+    # Legacy runs without meta.json
+    for run_id in discover_legacy_runs():
+        if run_id in seen:
+            continue
+        seen.add(run_id)
+        run_path = RUNS_DIR / run_id
+        results.append({
+            "run_id": run_id,
+            "run_type": "active",
+            "path": str(run_path),
+            "has_meta": False,
+        })
+
+    # Sort: examples first, then by run_id
+    results.sort(key=lambda r: (0 if r["run_type"] == "example" else 1, r["run_id"]))
+    return results

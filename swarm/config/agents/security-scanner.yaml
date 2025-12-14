@@ -1,0 +1,24 @@
+# Provider-neutral agent definition (Phase 1-full)
+
+key: security-scanner
+
+flows:
+  - gate
+
+category: verification
+color: blue
+source: project/user
+
+short_role: Run SAST and secret scans
+
+model: inherit
+
+outputs:
+  - path: RUN_BASE/gate/security_scan.md
+    format: markdown
+
+tags:
+  - flow-4
+  - gate
+  - verification
+  - security

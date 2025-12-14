@@ -1,0 +1,83 @@
+name: Swarm validation
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - "swarm/**"
+      - ".claude/**"
+      - ".github/workflows/swarm-validate.yml"
+  pull_request:
+    paths:
+      - "swarm/**"
+      - ".claude/**"
+      - ".github/workflows/swarm-validate.yml"
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  validate-swarm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install uv and jq
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          sudo apt-get install -y jq
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
+      - name: Install dependencies
+        run: uv sync --frozen --extra dev
+
+      - name: Run swarm validation gate (strict on main)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          ./swarm/tools/ci_validate_swarm.sh \
+            --fail-on-warn \
+            --list-issues
+        continue-on-error: false
+
+      - name: Run swarm validation gate (lenient on PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          ./swarm/tools/ci_validate_swarm.sh \
+            --fail-on-fail \
+            --list-issues
+        continue-on-error: false
+
+      - name: Run unit tests
+        if: success()
+        run: make test-unit
+        continue-on-error: false
+
+      - name: Run integration tests (xfail allowed)
+        if: success()
+        run: make test-integration || true
+        continue-on-error: true
+
+      - name: Run full swarm dev check (backup)
+        if: success()
+        run: make dev-check || true

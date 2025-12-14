@@ -1,0 +1,3 @@
+{"timestamp": "2025-12-09T10:20:43.249468+00:00Z", "role": "system", "content": "Executing step contract with agent contract-enforcer"}
+{"timestamp": "2025-12-09T10:20:43.249468+00:00Z", "role": "user", "content": "Step role: Check API changes versus contracts \u2192 contract_audit.md."}
+{"timestamp": "2025-12-09T10:20:43.249494+00:00Z", "role": "assistant", "content": "[STUB] Completed step contract. In production, this would contain the actual Claude response."}

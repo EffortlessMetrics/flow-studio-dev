@@ -1,0 +1,289 @@
+# Alert Routing Configuration
+# Defines how alerts are delivered based on severity
+
+version: "1.0"
+channels:
+  # ============================================================================
+  # PAGE SEVERITY - Immediate notification with escalation
+  # ============================================================================
+
+  pagerduty:
+    enabled: true
+    service_key: "${PAGERDUTY_SERVICE_KEY}"
+    routing_key: "${PAGERDUTY_ROUTING_KEY}"
+    description: "24/7 on-call rotation for critical selftest failures"
+    severity_filter: ["PAGE"]
+    escalation_policy: "swarm-oncall"
+    auto_resolve: true
+    auto_resolve_timeout: 30m
+    dedupe_key_template: "selftest-{alert_name}-{environment}"
+
+    alerts:
+      - kernel_failure_rate_critical
+      - blocked_test_detected
+      - p95_duration_degraded
+
+    message_format:
+      title: "[{severity}] Selftest Alert: {alert_name}"
+      body: |
+        **Alert:** {alert_name}
+        **Severity:** {severity}
+        **Description:** {description}
+
+        **Threshold Exceeded:** {threshold}
+        **Window:** {window}
+        **Current Value:** {current_value}
+
+        **Remediation:**
+        {remediation_hint}
+
+        **Dashboard:** {dashboard_link}
+        **Runbook:** {runbook}
+        **Incident Pack:** Run `make selftest-incident-pack` and attach to incident
+
+      links:
+        - text: "View Dashboard"
+          href: "{dashboard_link}"
+        - text: "Runbook"
+          href: "{runbook}"
+        - text: "Generate Incident Pack"
+          href: "https://github.com/{org}/{repo}/actions/workflows/incident-pack.yml"
+
+  # ============================================================================
+  # TICKET SEVERITY - Async notification via Slack and GitHub
+  # ============================================================================
+
+  slack:
+    enabled: true
+    webhook_url: "${SLACK_WEBHOOK_URL}"
+    channel: "#selftest-issues"
+    username: "Selftest Monitor"
+    icon_emoji: ":warning:"
+    severity_filter: ["TICKET", "PAGE"]
+    mention_on_page: "@oncall"
+
+    alerts:
+      - governance_failure_rate_elevated
+      - flaky_test_pattern
+      - degradation_log_growth
+      - optional_step_repeated_failure
+      # PAGE alerts also sent to Slack for visibility
+      - kernel_failure_rate_critical
+      - blocked_test_detected
+      - p95_duration_degraded
+
+    message_format:
+      text: |
+        :warning: *{severity}* Selftest Alert: *{alert_name}*
+
+        *Description:* {description}
+
+        *Threshold:* {threshold} ({window} window)
+        *Current Value:* {current_value}
+
+        *Remediation:*
+        {remediation_hint}
+
+        <{dashboard_link}|View Dashboard> | <{runbook}|Runbook>
+
+      color_map:
+        PAGE: "danger"    # Red
+        TICKET: "warning"  # Yellow
+        INFO: "#439FE0"    # Blue
+
+  github_issues:
+    enabled: true
+    repo: "${GITHUB_REPO}"  # e.g., "EffortlessMetrics/flow-studio"
+    token: "${GITHUB_TOKEN}"
+    severity_filter: ["TICKET"]
+    auto_create: true
+    auto_close_on_resolve: true
+    dedupe_window: 24h  # Don't create duplicate issues within 24h
+
+    alerts:
+      - governance_failure_rate_elevated
+      - flaky_test_pattern
+      - degradation_log_growth
+      - optional_step_repeated_failure
+
+    issue_template:
+      title: "[Selftest Alert] {alert_name}"
+      body: |
+        ## Alert Details
+
+        **Alert Name:** {alert_name}
+        **Severity:** {severity}
+        **Triggered At:** {timestamp}
+        **Environment:** {environment}
+
+        ## Description
+
+        {description}
+
+        ## Metrics
+
+        - **Threshold:** {threshold}
+        - **Window:** {window}
+        - **Current Value:** {current_value}
+        - **SLO Reference:** {slo_reference}
+
+        ## Remediation
+
+        {remediation_hint}
+
+        ## Resources
+
+        - [Dashboard]({dashboard_link})
+        - [Runbook]({runbook})
+        - [SLO Definition]({slo_link})
+
+        ## Incident Pack
+
+        To generate a full diagnostic bundle, run:
+        ```bash
+        make selftest-incident-pack
+        ```
+
+        Attach the resulting tar.gz to this issue.
+
+        ## Next Steps
+
+        - [ ] Review degradation log
+        - [ ] Run incident pack
+        - [ ] Identify root cause
+        - [ ] Apply remediation
+        - [ ] Update runbook if needed
+        - [ ] Close issue when resolved
+
+      labels:
+        - "selftest"
+        - "alert"
+        - "severity:{severity_lower}"
+
+      assignees: []  # Can be set per alert or derived from on-call schedule
+
+  # ============================================================================
+  # EMAIL - Digest for trends and info-level alerts
+  # ============================================================================
+
+  email:
+    enabled: false  # Optional: enable for daily/weekly digests
+    smtp_server: "${SMTP_SERVER}"
+    smtp_port: 587
+    from_address: "selftest-alerts@example.com"
+    to_addresses:
+      - "swarm-team@example.com"
+    severity_filter: ["INFO"]
+
+    digest_schedule: "daily"  # daily | weekly | immediate
+    digest_time: "09:00"  # UTC
+
+    message_format:
+      subject: "[Selftest] {severity} Alert: {alert_name}"
+      body_html: |
+        <html>
+        <body>
+          <h2>{alert_name}</h2>
+          <p><strong>Severity:</strong> {severity}</p>
+          <p><strong>Description:</strong> {description}</p>
+          <p><strong>Threshold:</strong> {threshold} ({window})</p>
+          <p><strong>Current Value:</strong> {current_value}</p>
+
+          <h3>Remediation</h3>
+          <p>{remediation_hint}</p>
+
+          <p>
+            <a href="{dashboard_link}">View Dashboard</a> |
+            <a href="{runbook}">Runbook</a>
+          </p>
+        </body>
+        </html>
+
+# ============================================================================
+# Routing Rules - Define fallback and escalation behavior
+# ============================================================================
+
+routing_rules:
+  # Primary routing by severity
+  severity_routing:
+    PAGE:
+      primary: [pagerduty, slack]
+      fallback: [email]
+      escalate_after: 15m
+
+    TICKET:
+      primary: [slack, github_issues]
+      fallback: [email]
+      escalate_after: N/A
+
+    INFO:
+      primary: [email]
+      fallback: []
+      escalate_after: N/A
+
+  # Time-based routing (optional)
+  time_based:
+    enabled: false
+    business_hours:
+      days: ["Mon", "Tue", "Wed", "Thu", "Fri"]
+      start: "09:00"
+      end: "17:00"
+      timezone: "America/New_York"
+      routing:
+        PAGE: [slack, pagerduty]
+        TICKET: [slack, github_issues]
+
+    after_hours:
+      routing:
+        PAGE: [pagerduty]
+        TICKET: [github_issues]
+
+  # Environment-specific routing
+  environment_routing:
+    production:
+      PAGE: [pagerduty, slack]
+      TICKET: [slack, github_issues]
+
+    staging:
+      PAGE: [slack]
+      TICKET: [github_issues]
+
+    development:
+      PAGE: [slack]
+      TICKET: []
+
+# ============================================================================
+# Channel Health Monitoring
+# ============================================================================
+
+health_checks:
+  pagerduty:
+    check_interval: 5m
+    timeout: 10s
+    endpoint: "https://api.pagerduty.com/health"
+
+  slack:
+    check_interval: 5m
+    timeout: 10s
+    test_message_enabled: false
+
+  github_issues:
+    check_interval: 10m
+    timeout: 15s
+    api_rate_limit_threshold: 100  # remaining calls
+
+# ============================================================================
+# Metadata
+# ============================================================================
+
+metadata:
+  last_updated: "2025-12-01"
+  maintainer: "swarm-team"
+  documentation: "observability/alerts/README.md"
+  version_changelog:
+    - version: "1.0"
+      date: "2025-12-01"
+      changes:
+        - "Initial alert routing configuration"
+        - "3 PAGE alerts, 4 TICKET alerts, 1 INFO alert"
+        - "PagerDuty, Slack, GitHub Issues, Email channels"

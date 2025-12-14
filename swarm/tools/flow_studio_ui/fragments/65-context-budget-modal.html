@@ -1,0 +1,279 @@
+<!-- Context Budget Settings Modal (v2.4.0) -->
+<div id="context-budget-modal" class="settings-modal" role="dialog"
+     aria-modal="true" aria-labelledby="context-budget-modal-title"
+     data-uiid="flow_studio.modal.context_budget">
+  <div class="settings-content">
+    <button class="modal-close" aria-label="Close"
+            data-uiid="flow_studio.modal.context_budget.close">&times;</button>
+
+    <h3 id="context-budget-modal-title">Context Budget Settings</h3>
+    <p class="settings-description">
+      Configure history context limits for stepwise execution.
+      These budgets control how much previous step output is included in prompts.
+    </p>
+
+    <div class="settings-section">
+      <h4>Current Effective Values</h4>
+      <div class="budget-display" data-uiid="flow_studio.modal.context_budget.effective">
+        <!-- Populated by JavaScript -->
+        <div class="budget-value"><strong>Total Budget:</strong> <span id="effective-total">200,000</span> chars</div>
+        <div class="budget-value"><strong>Recent Step:</strong> <span id="effective-recent">60,000</span> chars</div>
+        <div class="budget-value"><strong>Older Steps:</strong> <span id="effective-older">10,000</span> chars each</div>
+        <div class="budget-source">Source: <code id="effective-source">default</code></div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h4>Profile Override</h4>
+      <p class="settings-hint">
+        Set custom values for this profile. Leave empty to use defaults.
+      </p>
+      <div class="budget-inputs" data-uiid="flow_studio.modal.context_budget.profile_form">
+        <div class="input-group">
+          <label for="budget-total">Total History Budget (chars)</label>
+          <input type="number" id="budget-total"
+                 min="10000" max="1000000" step="10000"
+                 placeholder="200000"
+                 data-uiid="flow_studio.modal.context_budget.input.total">
+          <span class="input-hint">~<span id="budget-total-tokens">50</span>k tokens</span>
+        </div>
+
+        <div class="input-group">
+          <label for="budget-recent">Recent Step Max (chars)</label>
+          <input type="number" id="budget-recent"
+                 min="1000" max="500000" step="5000"
+                 placeholder="60000"
+                 data-uiid="flow_studio.modal.context_budget.input.recent">
+          <span class="input-hint">~<span id="budget-recent-tokens">15</span>k tokens</span>
+        </div>
+
+        <div class="input-group">
+          <label for="budget-older">Older Step Max (chars)</label>
+          <input type="number" id="budget-older"
+                 min="500" max="100000" step="1000"
+                 placeholder="10000"
+                 data-uiid="flow_studio.modal.context_budget.input.older">
+          <span class="input-hint">~<span id="budget-older-tokens">2.5</span>k tokens each</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-presets">
+      <h4>Quick Presets</h4>
+      <div class="preset-buttons">
+        <button class="btn-preset" data-preset="lean" title="Minimal history for fast execution">
+          Lean (25k tokens)
+        </button>
+        <button class="btn-preset" data-preset="balanced" title="Default balanced settings">
+          Balanced (50k tokens)
+        </button>
+        <button class="btn-preset" data-preset="heavy" title="Maximum context for complex flows">
+          Heavy (100k tokens)
+        </button>
+      </div>
+    </div>
+
+    <div class="settings-actions">
+      <button class="btn-secondary" data-uiid="flow_studio.modal.context_budget.reset">
+        Reset to Defaults
+      </button>
+      <button class="btn-primary" data-uiid="flow_studio.modal.context_budget.save">
+        Save to Profile
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+/* Context Budget Modal Styles */
+#context-budget-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+}
+
+#context-budget-modal.open {
+  display: flex;
+}
+
+#context-budget-modal .settings-content {
+  background: var(--bg-primary, #1e1e1e);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+#context-budget-modal .modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--text-secondary, #888);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+}
+
+#context-budget-modal .modal-close:hover {
+  color: var(--text-primary, #fff);
+}
+
+#context-budget-modal h3 {
+  margin: 0 0 8px 0;
+  color: var(--text-primary, #fff);
+  font-size: 18px;
+}
+
+#context-budget-modal h4 {
+  margin: 16px 0 8px 0;
+  color: var(--text-primary, #fff);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+#context-budget-modal .settings-description {
+  color: var(--text-secondary, #888);
+  font-size: 13px;
+  margin: 0 0 16px 0;
+}
+
+#context-budget-modal .settings-hint {
+  color: var(--text-tertiary, #666);
+  font-size: 12px;
+  margin: 0 0 12px 0;
+}
+
+#context-budget-modal .budget-display {
+  background: var(--bg-secondary, #252525);
+  border-radius: 4px;
+  padding: 12px;
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+}
+
+#context-budget-modal .budget-value {
+  margin: 4px 0;
+  color: var(--text-primary, #fff);
+}
+
+#context-budget-modal .budget-source {
+  margin-top: 8px;
+  color: var(--text-secondary, #888);
+  font-size: 12px;
+}
+
+#context-budget-modal .budget-source code {
+  background: var(--bg-tertiary, #333);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+#context-budget-modal .input-group {
+  margin-bottom: 16px;
+}
+
+#context-budget-modal .input-group label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-primary, #fff);
+  font-size: 13px;
+}
+
+#context-budget-modal .input-group input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-secondary, #252525);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 4px;
+  color: var(--text-primary, #fff);
+  font-size: 14px;
+  font-family: var(--font-mono, monospace);
+}
+
+#context-budget-modal .input-group input:focus {
+  outline: none;
+  border-color: var(--accent-color, #0078d4);
+}
+
+#context-budget-modal .input-hint {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-tertiary, #666);
+  font-size: 11px;
+}
+
+#context-budget-modal .preset-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+#context-budget-modal .btn-preset {
+  padding: 6px 12px;
+  background: var(--bg-secondary, #252525);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 4px;
+  color: var(--text-secondary, #888);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+#context-budget-modal .btn-preset:hover {
+  background: var(--bg-tertiary, #333);
+  color: var(--text-primary, #fff);
+  border-color: var(--accent-color, #0078d4);
+}
+
+#context-budget-modal .settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color, #333);
+}
+
+#context-budget-modal .btn-secondary {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid var(--border-color, #333);
+  border-radius: 4px;
+  color: var(--text-secondary, #888);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+#context-budget-modal .btn-secondary:hover {
+  background: var(--bg-secondary, #252525);
+  color: var(--text-primary, #fff);
+}
+
+#context-budget-modal .btn-primary {
+  padding: 8px 16px;
+  background: var(--accent-color, #0078d4);
+  border: 1px solid var(--accent-color, #0078d4);
+  border-radius: 4px;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+#context-budget-modal .btn-primary:hover {
+  background: var(--accent-hover, #106ebe);
+}
+</style>

@@ -1,0 +1,221 @@
+{
+  "version": "1.0.0",
+  "description": "Expected artifacts per flow/step for run status overlay in Flow Studio",
+  "flows": {
+    "signal": {
+      "title": "Flow 1 - Signal",
+      "decision_artifact": "problem_statement.md",
+      "steps": {
+        "normalize": {
+          "required": ["issue_normalized.md", "context_brief.md"],
+          "optional": ["related_links.json"]
+        },
+        "frame": {
+          "required": ["problem_statement.md"],
+          "optional": []
+        },
+        "author_reqs": {
+          "required": ["requirements_functional.md"],
+          "optional": ["requirements_constraints.md"]
+        },
+        "critique_reqs": {
+          "required": ["requirements_check.md"],
+          "optional": []
+        },
+        "author_bdd": {
+          "required": [],
+          "optional": [],
+          "note": "BDD features go to features/*.feature at repo root"
+        },
+        "scope": {
+          "required": ["early_risk_assessment.md"],
+          "optional": ["example_matrix.md", "clarification_questions_final.md"]
+        }
+      }
+    },
+    "plan": {
+      "title": "Flow 2 - Plan",
+      "decision_artifact": "implementation_plan.md",
+      "steps": {
+        "impact": {
+          "required": ["impact_map.json"],
+          "optional": ["iac_surface_map.md"]
+        },
+        "options": {
+          "required": ["design_options.md"],
+          "optional": []
+        },
+        "adr": {
+          "required": ["adr_current.md"],
+          "optional": []
+        },
+        "interface": {
+          "required": ["interface_spec.md"],
+          "optional": ["api_contracts.yaml", "data_spec.md"]
+        },
+        "observability": {
+          "required": ["observability_spec.md"],
+          "optional": []
+        },
+        "test_strategy": {
+          "required": ["test_plan.md"],
+          "optional": []
+        },
+        "work": {
+          "required": ["implementation_plan.md"],
+          "optional": ["policy_plan.md"]
+        },
+        "design_critique": {
+          "required": ["design_feasibility.md"],
+          "optional": []
+        }
+      }
+    },
+    "build": {
+      "title": "Flow 3 - Build",
+      "decision_artifact": "build_receipt.json",
+      "steps": {
+        "branch": {
+          "required": [],
+          "optional": [],
+          "note": "Git operation only, no file output"
+        },
+        "load_context": {
+          "required": ["subtask_context_manifest.json"],
+          "optional": []
+        },
+        "clarify": {
+          "required": [],
+          "optional": ["clarification_questions.md"]
+        },
+        "author_tests": {
+          "required": ["test_changes_summary.md"],
+          "optional": ["fuzz_changes_summary.md"]
+        },
+        "critique_tests": {
+          "required": ["test_critique.md"],
+          "optional": []
+        },
+        "implement": {
+          "required": ["impl_changes_summary.md"],
+          "optional": []
+        },
+        "critique_code": {
+          "required": ["code_critique.md"],
+          "optional": []
+        },
+        "mutate": {
+          "required": [],
+          "optional": ["mutation_report.md"]
+        },
+        "fix": {
+          "required": [],
+          "optional": ["refactor_notes.md"]
+        },
+        "docs": {
+          "required": [],
+          "optional": ["doc_updates_summary.md"]
+        },
+        "self_review": {
+          "required": ["self_review.md", "build_receipt.json"],
+          "optional": []
+        },
+        "commit": {
+          "required": [],
+          "optional": [],
+          "note": "Git operation only, no file output"
+        }
+      }
+    },
+    "gate": {
+      "title": "Flow 4 - Gate",
+      "decision_artifact": "merge_recommendation.md",
+      "steps": {
+        "receipt": {
+          "required": ["receipt_audit.md"],
+          "optional": []
+        },
+        "contract": {
+          "required": ["contract_status.md"],
+          "optional": []
+        },
+        "security": {
+          "required": ["security_status.md"],
+          "optional": []
+        },
+        "coverage": {
+          "required": [],
+          "optional": ["coverage_audit.md"],
+          "note": "May be merged into other status files"
+        },
+        "gate_fix": {
+          "required": [],
+          "optional": ["gate_fix_summary.md"]
+        },
+        "merge_decision": {
+          "required": ["merge_recommendation.md"],
+          "optional": ["policy_verdict.md", "gate_risk_report.md", "perf_status.md"]
+        }
+      }
+    },
+    "deploy": {
+      "title": "Flow 5 - Deploy",
+      "decision_artifact": "deployment_decision.md",
+      "steps": {
+        "decide": {
+          "required": ["deployment_log.md"],
+          "optional": []
+        },
+        "monitor": {
+          "required": ["verification_report.md"],
+          "optional": []
+        },
+        "smoke": {
+          "required": [],
+          "optional": [],
+          "note": "Appends to verification_report.md"
+        },
+        "finalize": {
+          "required": ["deployment_decision.md"],
+          "optional": []
+        },
+        "report": {
+          "required": [],
+          "optional": [],
+          "note": "Posts to GitHub, no file output"
+        }
+      }
+    },
+    "wisdom": {
+      "title": "Flow 6 - Wisdom",
+      "decision_artifact": "learnings.md",
+      "steps": {
+        "audit": {
+          "required": ["artifact_audit.md"],
+          "optional": []
+        },
+        "regression": {
+          "required": ["regression_report.md"],
+          "optional": []
+        },
+        "history": {
+          "required": ["flow_history.json"],
+          "optional": ["flow_timeline.md"]
+        },
+        "learnings": {
+          "required": ["learnings.md"],
+          "optional": []
+        },
+        "feedback": {
+          "required": ["feedback_actions.md"],
+          "optional": ["playbook_update.md"]
+        },
+        "wisdom_report": {
+          "required": [],
+          "optional": [],
+          "note": "Posts to GitHub, no file output"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,58 @@
+id: walk-signal
+title: "Walk Signal Flow"
+description: "Follow how raw input becomes a problem statement"
+steps:
+  - target:
+      type: flow
+      flow: signal
+    title: "Signal Flow Overview"
+    text: "Signal takes raw input and produces requirements, BDD scenarios, and risk assessment. This is Flow 1 of the SDLC."
+    action: select_flow
+
+  - target:
+      type: step
+      flow: signal
+      step: normalize
+    title: "Parse Raw Input"
+    text: "The signal-normalizer agent parses issues, tickets, or PRDs into a structured format. It produces issue_normalized.md and context_brief.md."
+    action: select_step
+
+  - target:
+      type: step
+      flow: signal
+      step: frame
+    title: "Frame the Problem"
+    text: "Problem-framer synthesizes context into problem_statement.md - the flow's decision artifact with clear success criteria."
+    action: select_step
+
+  - target:
+      type: step
+      flow: signal
+      step: author_reqs
+    title: "Write Requirements"
+    text: "Requirements-author writes functional and non-functional requirements following a structured template. Output: requirements.md."
+    action: select_step
+
+  - target:
+      type: step
+      flow: signal
+      step: critique_reqs
+    title: "Critique Requirements"
+    text: "Requirements-critic provides harsh review for completeness, feasibility, and testability. Critics never fix - they only identify issues."
+    action: select_step
+
+  - target:
+      type: step
+      flow: signal
+      step: author_bdd
+    title: "Author BDD Scenarios"
+    text: "BDD-author turns verified requirements into executable Gherkin scenarios in features/*.feature files."
+    action: select_step
+
+  - target:
+      type: step
+      flow: signal
+      step: scope
+    title: "Assess Scope"
+    text: "Scope-assessor evaluates stakeholders, constraints, risks, and effort. Output: scope_assessment.md. This completes Flow 1."
+    action: select_step

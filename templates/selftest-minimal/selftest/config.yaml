@@ -1,0 +1,107 @@
+# Selftest Configuration
+# ----------------------
+# This file defines your project's selftest steps organized into three tiers:
+#   - KERNEL: Critical checks that must pass (lint, compile, basic tests)
+#   - GOVERNANCE: Policy checks that should pass (security, coverage thresholds)
+#   - OPTIONAL: Nice-to-have checks (performance, experimental features)
+#
+# Each step can be:
+#   - A shell command (inline)
+#   - A script in selftest/steps/ (script: my-step.sh)
+#   - A Python module (python: my_module.check)
+
+version: "1.0"
+
+# Project metadata
+project:
+  name: my-project
+  description: "Example selftest configuration"
+
+# Tier definitions
+tiers:
+  - name: KERNEL
+    description: "Critical checks - failures block everything"
+    fail_fast: true
+
+  - name: GOVERNANCE
+    description: "Policy checks - failures block merge"
+    fail_fast: false
+
+  - name: OPTIONAL
+    description: "Nice-to-have checks - failures are warnings"
+    fail_fast: false
+    blocking: false
+
+# Step definitions
+steps:
+  # --- KERNEL TIER (3 steps) ---
+  - id: lint
+    name: "Code Linting"
+    tier: KERNEL
+    command: |
+      # Lint Python files with ruff (fast, opinionated)
+      # Customize: change to your preferred linter
+      ruff check . --fix --exit-non-zero-on-fix || exit 1
+    timeout: 60
+
+  - id: compile
+    name: "Compilation Check"
+    tier: KERNEL
+    command: |
+      # Verify all Python files can be compiled
+      # Catches syntax errors before tests run
+      python -m compileall -q . || exit 1
+    timeout: 30
+
+  - id: unit-tests
+    name: "Unit Tests"
+    tier: KERNEL
+    command: |
+      # Run fast unit tests only
+      # Customize: adjust pytest args for your test structure
+      pytest tests/unit/ -q --tb=short || exit 1
+    timeout: 300
+
+  # --- GOVERNANCE TIER (2 steps) ---
+  - id: security-scan
+    name: "Security Scanning"
+    tier: GOVERNANCE
+    command: |
+      # Basic security checks with bandit
+      # Customize: add your security scanning tools
+      bandit -r src/ -ll -q || exit 1
+    timeout: 120
+
+  - id: coverage-check
+    name: "Coverage Threshold"
+    tier: GOVERNANCE
+    command: |
+      # Ensure test coverage meets minimum threshold
+      # Customize: adjust --cov-fail-under for your project
+      pytest tests/ --cov=src --cov-fail-under=70 -q || exit 1
+    timeout: 300
+
+  # --- OPTIONAL TIER (1 step) ---
+  - id: type-check
+    name: "Type Checking"
+    tier: OPTIONAL
+    command: |
+      # Static type checking with mypy
+      # Optional because not all projects use type hints
+      mypy src/ --ignore-missing-imports || exit 1
+    timeout: 180
+
+# Environment variables (optional)
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  PYTHONUNBUFFERED: "1"
+
+# Hooks (optional)
+hooks:
+  # Run before all steps
+  pre_run: |
+    echo "Starting selftest run..."
+
+  # Run after all steps (regardless of success/failure)
+  post_run: |
+    echo "Selftest complete."

@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: feedback-applier
+flows:
+  - wisdom
+category: analytics
+color: orange
+source: project/user
+short_role: "Create issues, suggest doc updates → feedback_actions.md."
+model: inherit

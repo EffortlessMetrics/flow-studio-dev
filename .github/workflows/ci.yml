@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-swarm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Validate swarm spec/impl alignment
+        run: uv run swarm/tools/validate_swarm.py
+
+  # Contract A: compiled JS must match repo (prevents TS/JS drift)
+  check-ui-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install npm dependencies
+        working-directory: swarm/tools/flow_studio_ui
+        run: npm ci
+
+      - name: Rebuild TypeScript
+        working-directory: swarm/tools/flow_studio_ui
+        run: npm run ts-build
+
+      - name: Check for drift
+        run: |
+          if ! git diff --exit-code -- swarm/tools/flow_studio_ui/js/; then
+            echo "::error::Flow Studio JS drift detected! Run 'make ts-build' and commit the output."
+            exit 1
+          fi
+
+          if [ -n "$(git ls-files --others --exclude-standard swarm/tools/flow_studio_ui/js/)" ]; then
+            echo "::error::Untracked generated Flow Studio JS detected! Run 'make ts-build' and commit the new files."
+            git ls-files --others --exclude-standard swarm/tools/flow_studio_ui/js/
+            exit 1
+          fi
+
+          echo "✓ Compiled JS matches repo"
+
+  test-swarm:
+    runs-on: ubuntu-latest
+    needs: validate-swarm
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml', 'uv.lock', '.github/workflows/*.yml') }}-v1
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
+      - name: Install dependencies
+        run: uv sync --frozen --extra dev
+
+      - name: Run gating tests
+        run: |
+          # Gating tests: all tests except performance benchmarks
+          # Performance tests run separately in a non-blocking job
+          make test-gating
+
+  # Performance tests run in parallel but do not block CI
+  # Results are informational for tracking performance regressions
+  test-performance:
+    runs-on: ubuntu-latest
+    needs: validate-swarm
+    timeout-minutes: 15
+    continue-on-error: true  # Non-blocking: failures don't fail the workflow
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml', 'uv.lock', '.github/workflows/*.yml') }}-v1
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
+      - name: Install dependencies
+        run: uv sync --frozen --extra dev
+
+      - name: Run performance benchmarks
+        run: |
+          # Performance tests: benchmarks that don't gate CI
+          # Results are for tracking performance trends over time
+          make test-performance

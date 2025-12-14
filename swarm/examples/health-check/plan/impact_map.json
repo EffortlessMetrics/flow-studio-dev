@@ -1,0 +1,6 @@
+{
+  "service": "demo-service",
+  "modules": ["src/router.rs", "src/handlers/health.rs"],
+  "components": ["http-server", "routing"],
+  "risk_clusters": ["routing"]
+}

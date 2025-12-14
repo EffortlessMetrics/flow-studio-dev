@@ -1,0 +1,3 @@
+{"timestamp": "2025-12-09T10:20:43.251898+00:00Z", "role": "system", "content": "Executing step finalize with agent deploy-decider"}
+{"timestamp": "2025-12-09T10:20:43.251898+00:00Z", "role": "user", "content": "Step role: Synthesize CI + smoke results into deployment_decision.md with status: STABLE/INVESTIGATE/ROLLBACK/NOT_DEPLOYED."}
+{"timestamp": "2025-12-09T10:20:43.251920+00:00Z", "role": "assistant", "content": "[STUB] Completed step finalize. In production, this would contain the actual Claude response."}

@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: context-loader
+flows:
+  - build
+category: implementation
+color: green
+source: project/user
+short_role: "Load relevant code/tests/specs for subtask → subtask_context_manifest.json."
+model: inherit

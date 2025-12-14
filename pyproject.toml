@@ -1,0 +1,85 @@
+[project]
+name = "flow-studio"
+version = "0.1.0"
+description = "Flow Studio - Agentic SDLC visualization and orchestration harness"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pyyaml>=6.0.3",
+    "pytest-bdd>=8.1.0",
+    "fastapi>=0.124.0",
+    "uvicorn[standard]>=0.38.0",
+    "httpx>=0.28.1",
+    "playwright>=1.56.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.14.8",
+    "black>=25.11.0",
+    "pytest>=9.0.2",
+    "pytest-bdd>=8.1.0",
+    "pytest-benchmark>=5.2.3",
+]
+mcp = [
+    "mcp>=1.23.1",
+]
+
+[project.urls]
+Repository = "https://github.com/EffortlessMetrics/flow-studio"
+Documentation = "https://github.com/EffortlessMetrics/flow-studio/blob/main/docs/INDEX.md"
+"Issue Tracker" = "https://github.com/EffortlessMetrics/flow-studio/issues"
+
+[tool.uv]
+managed = true
+
+[tool.ruff]
+# Only lint swarm tooling, not tests (pytest owns test correctness)
+src = ["swarm/tools", "swarm/validator"]
+line-length = 100
+# Exclude archived files (deprecated code preserved for reference only)
+exclude = ["swarm/tools/_archive/*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = [
+    "E501",  # line length handled elsewhere
+]
+
+[tool.mypy]
+python_version = "3.13"
+files = ["swarm/tools/validate_swarm.py", "swarm/validator"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short --color=yes"
+markers = [
+    "ac_selftest_kernel_fast: AC-SELFTEST-KERNEL-FAST cluster tests",
+    "ac_selftest_introspectable: AC-SELFTEST-INTROSPECTABLE cluster tests",
+    "ac_selftest_individual_steps: AC-SELFTEST-INDIVIDUAL-STEPS cluster tests",
+    "ac_selftest_degraded: AC-SELFTEST-DEGRADED cluster tests",
+    "ac_selftest_failure_hints: AC-SELFTEST-FAILURE-HINTS cluster tests",
+    "ac_selftest_degradation_tracked: AC-SELFTEST-DEGRADATION-TRACKED cluster tests",
+    "quick: < 100ms (unit tests, mocks)",
+    "medium: 100ms-1s (integration, light subprocess)",
+    "slow: > 1s (full subprocess, file I/O)",
+    "unit: Isolated logic test",
+    "integration: CLI, file I/O, subprocess",
+    "bdd: BDD scenario (executable spec)",
+    "performance: Performance benchmark tests",
+]
+filterwarnings = [
+    # Suppress gherkin library deprecation warnings (maxsplit positional arg)
+    # These patterns must match the exact module path where warning originates
+    "ignore:'maxsplit' is passed as positional argument:DeprecationWarning",
+    "ignore::DeprecationWarning:gherkin.gherkin_line",
+    "ignore::DeprecationWarning:gherkin.*",
+]
+
+[dependency-groups]
+dev = [
+    "prometheus-client>=0.23.1",
+    "pytest-benchmark>=5.2.3",
+]

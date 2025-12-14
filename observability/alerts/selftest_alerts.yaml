@@ -1,0 +1,169 @@
+# Selftest Alert Policies
+# Based on SLOs defined in observability/slos/selftest_slos.yaml
+#
+# Alert severities:
+# - PAGE: Wake someone up (PagerDuty on-call)
+# - TICKET: Create issue/Slack message (async response)
+
+version: "1.0"
+alerts:
+  # ============================================================================
+  # PAGE SEVERITY - Critical failures requiring immediate attention
+  # ============================================================================
+
+  - name: kernel_failure_rate_critical
+    severity: PAGE
+    description: >
+      Kernel failures exceed 5% of runs in 5-minute window.
+      This indicates core infrastructure problems (Python lint, compile checks).
+    query: |
+      rate(selftest_step_failures{tier="KERNEL"}[5m]) > 0.05
+    threshold: 0.05
+    window: 5m
+    slo_reference: kernel_availability_slo
+    remediation_hint: >
+      Run `make selftest-doctor` to diagnose harness vs service issues.
+      Check for Python syntax errors, import failures, or broken dependencies.
+      Review recent commits that may have introduced compile errors.
+    dashboard_link: "http://localhost:5000/metrics/dashboard?view=kernel_health"
+    runbook: "docs/runbooks/kernel_failure.md"
+
+  - name: blocked_test_detected
+    severity: PAGE
+    description: >
+      Any test is BLOCKED in the last 3 consecutive runs.
+      BLOCKED status indicates a configuration or environment issue preventing execution.
+    query: |
+      count_over_time(selftest_step_status{status="BLOCKED"}[3 consecutive runs]) > 0
+    threshold: 1
+    window: "3 runs"
+    slo_reference: no_blocked_tests_slo
+    remediation_hint: >
+      Check degradation log: `make selftest-degradation-log`.
+      Blocked tests usually indicate missing dependencies, broken config, or filesystem issues.
+      Run the incident pack: `make selftest-incident-pack` for full diagnostics.
+    dashboard_link: "http://localhost:5000/metrics/dashboard?view=blocked_tests"
+    runbook: "docs/runbooks/blocked_test.md"
+
+  - name: p95_duration_degraded
+    severity: PAGE
+    description: >
+      P95 selftest duration exceeds 180 seconds (3 minutes).
+      System is degraded but recoverable; investigate performance regression.
+    query: |
+      histogram_quantile(0.95, selftest_duration_seconds_bucket) > 180
+    threshold: 180
+    window: 5m
+    slo_reference: selftest_duration_slo
+    remediation_hint: >
+      Check for slow tests: run with `--debug` flag to see per-step timings.
+      Look for network timeouts, hung processes, or I/O contention.
+      Consider running `kernel-smoke` to isolate fast vs slow steps.
+    dashboard_link: "http://localhost:5000/metrics/dashboard?view=duration_trends"
+    runbook: "docs/runbooks/performance_degradation.md"
+
+  # ============================================================================
+  # TICKET SEVERITY - Issues requiring investigation but not immediate action
+  # ============================================================================
+
+  - name: governance_failure_rate_elevated
+    severity: TICKET
+    description: >
+      Governance failures exceed 10% in 1 hour window.
+      This indicates systemic issues with agent definitions, BDD files, or policy checks.
+    query: |
+      rate(selftest_step_failures{tier="GOVERNANCE"}[1h]) > 0.10
+    threshold: 0.10
+    window: 1h
+    slo_reference: governance_availability_slo
+    remediation_hint: >
+      Run `make validate-swarm --strict` to identify specific violations.
+      Check recent agent/flow/skill changes for frontmatter or schema errors.
+      Review degradation log for patterns: `make selftest-degradation-log`.
+    dashboard_link: "http://localhost:5000/metrics/dashboard?view=governance_health"
+    runbook: "docs/runbooks/governance_failure.md"
+
+  - name: flaky_test_pattern
+    severity: TICKET
+    description: >
+      Same test step failing 3+ times in 24 hour window with intermittent passes.
+      Indicates a flaky test that needs stabilization.
+    query: |
+      count_over_time(selftest_step_failures{step="$STEP"}[24h]) >= 3
+      AND count_over_time(selftest_step_passes{step="$STEP"}[24h]) >= 1
+    threshold: 3
+    window: 24h
+    slo_reference: test_stability_slo
+    remediation_hint: >
+      Identify the flaky step and review its implementation.
+      Common causes: race conditions, timing dependencies, external service calls.
+      Consider adding retries, better error handling, or marking as xfail temporarily.
+    dashboard_link: "http://localhost:5000/metrics/dashboard?view=flaky_tests"
+    runbook: "docs/runbooks/flaky_test.md"
+
+  - name: degradation_log_growth
+    severity: TICKET
+    description: >
+      Degradation log growing at >10 entries per hour.
+      Multiple subsystems are degrading; investigate common cause.
+    query: |
+      rate(degradation_log_entries_total[1h]) > 10
+    threshold: 10
+    window: 1h
+    slo_reference: N/A
+    remediation_hint: >
+      Dump degradation log: `curl http://localhost:5000/platform/degradation-log`.
+      Look for common failure modes (e.g., filesystem issues, broken dependencies).
+      Recent infrastructure changes may have caused cascading failures.
+    dashboard_link: "http://localhost:5000/metrics/dashboard?view=degradation_trends"
+    runbook: "docs/runbooks/degradation_spike.md"
+
+  - name: optional_step_repeated_failure
+    severity: TICKET
+    description: >
+      OPTIONAL tier step failing >80% of runs in 6 hour window.
+      While optional, consistent failures suggest a real problem.
+    query: |
+      rate(selftest_step_failures{tier="OPTIONAL"}[6h]) > 0.80
+    threshold: 0.80
+    window: 6h
+    slo_reference: N/A
+    remediation_hint: >
+      Review the failing optional step (ac-coverage, extras).
+      Decide whether to fix the step, adjust thresholds, or remove it.
+      Optional failures should not block CI but may indicate technical debt.
+    dashboard_link: "http://localhost:5000/metrics/dashboard?view=optional_health"
+    runbook: "docs/runbooks/optional_failure.md"
+
+  # ============================================================================
+  # INFO SEVERITY - Monitoring and trends (no immediate action)
+  # ============================================================================
+
+  - name: selftest_success_rate_trending_down
+    severity: INFO
+    description: >
+      Overall selftest success rate declining over 7 day window.
+      Not critical but indicates growing technical debt or test fragility.
+    query: |
+      avg_over_time(selftest_success_rate[7d]) < 0.95
+    threshold: 0.95
+    window: 7d
+    slo_reference: N/A
+    remediation_hint: >
+      Review trends over time; identify which steps are contributing to decline.
+      Schedule a maintenance sprint to address accumulated issues.
+    dashboard_link: "http://localhost:5000/metrics/dashboard?view=trends"
+    runbook: "docs/runbooks/trend_analysis.md"
+
+# ============================================================================
+# Alert Metadata
+# ============================================================================
+
+metadata:
+  total_alerts: 8
+  page_severity_count: 3
+  ticket_severity_count: 4
+  info_severity_count: 1
+  last_updated: "2025-12-01"
+  maintainer: "swarm-team"
+  documentation: "observability/alerts/README.md"

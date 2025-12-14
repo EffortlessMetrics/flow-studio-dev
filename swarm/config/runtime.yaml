@@ -1,0 +1,81 @@
+# Runtime configuration for stepwise backends
+# Environment variables override these settings
+
+version: "1.1"
+
+# Provider definitions
+# Providers define API endpoints and authentication patterns
+providers:
+  anthropic:
+    base_url: null  # uses default Anthropic API (https://api.anthropic.com)
+    description: "Anthropic Claude API"
+  anthropic_compat:
+    base_url: null  # set via ANTHROPIC_BASE_URL env var or engine config
+    description: "Anthropic-compatible API (GLM/Z.AI, etc.)"
+
+# Step engine configuration
+engines:
+  gemini:
+    mode: "stub"  # Options: stub, cli
+    cli_path: null  # Override with SWARM_GEMINI_CLI env var
+
+  claude:
+    mode: "stub"  # Options: stub, sdk, cli
+    provider: "anthropic"  # which provider to use
+    env_keys: ["ANTHROPIC_API_KEY"]  # required env vars
+
+  claude-glm:
+    mode: "sdk"
+    provider: "anthropic_compat"
+    env_keys: ["ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL"]
+    env:
+      ANTHROPIC_BASE_URL: "https://api.z.ai/api/anthropic"
+
+# Default settings for all engines
+# NOTE: These budgets control INPUT context selection, not output generation.
+# Agents write complete outputs; budgets ensure prompts don't grow unboundedly.
+# See docs/CONTEXT_BUDGETS.md for the full philosophy.
+defaults:
+  stub_mode: true
+  # Context budget defaults (v2.4.0) - reduced from 400k/120k/20k to support
+  # ~50k tokens of history on 200k-token models, leaving room for CLAUDE.md,
+  # agents, teaching notes, and completion tokens.
+  # See docs/CONTEXT_BUDGETS.md for tuning guidance.
+  context_budget_chars: 200000      # ~50k tokens of history (was 400k)
+  history_max_recent_chars: 60000   # Most recent step (~15k tokens, was 120k)
+  history_max_older_chars: 10000    # Older steps (~2.5k tokens each, was 20k)
+  timeout_seconds: 30
+
+# Feature flags
+features:
+  stepwise_execution: true
+  context_handoff: true
+  write_transcripts: true
+  write_receipts: true
+
+# Per-flow backend recommendations
+# Each flow has a list of recommended backends in preference order
+flows:
+  signal:
+    recommended_backends:
+      - claude-harness
+      - gemini-step-orchestrator
+  plan:
+    recommended_backends:
+      - claude-harness
+      - gemini-step-orchestrator
+  build:
+    recommended_backends:
+      - claude-harness
+      - gemini-step-orchestrator
+      - claude-step-orchestrator
+  gate:
+    recommended_backends:
+      - claude-harness
+      - claude-step-orchestrator
+  deploy:
+    recommended_backends:
+      - claude-harness
+  wisdom:
+    recommended_backends:
+      - claude-harness

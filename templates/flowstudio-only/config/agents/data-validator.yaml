@@ -1,0 +1,7 @@
+# Data validator agent
+
+key: data-validator
+category: verification
+color: blue
+short_role: "Validate data quality and schema compliance."
+model: inherit

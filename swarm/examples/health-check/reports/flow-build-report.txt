@@ -1,0 +1,27 @@
+Flow: flow-build
+File: C:\Code\Swarm\demo-swarm-dev\swarm\flows\flow-build.md
+Steps parsed: 13
+
+Step 1 artifacts:
+  - subtask_context_manifest.json: OK
+Step 2 artifacts:
+  - tests/*: OK
+  - test_changes_summary.md: OK
+Step 3 artifacts:
+  - fuzz/*: OK
+  - fuzz_changes_summary.md: OK
+Step 4 artifacts:
+  - test_critique.md: OK
+Step 5 artifacts:
+  - impl_changes_summary.md: OK
+Step 6 artifacts:
+  - code_critique.md: OK
+Step 7 artifacts:
+  - mutation_report.md: OK
+Step 9 artifacts:
+  - refactor_notes.md: OK
+Step 10 artifacts:
+  - doc_updates_summary.md: OK
+Step 11 artifacts:
+  - self_review.md: OK
+  - build_receipt.json: OK

@@ -1,0 +1,25 @@
+# swarm/config/agents/contract-enforcer.yaml
+# Provider-neutral agent definition (Phase 0.5)
+
+key: contract-enforcer
+
+flows:
+  - gate          # Flow 4: Code → Artifact / Gate
+
+category: verification
+color: blue
+source: project/user
+
+short_role: Check API changes versus contracts
+
+model: inherit
+
+primary_artifact: contract_compliance.md
+
+artifacts:
+  - contract_compliance.md
+
+notes: >
+  Gate-stage verification agent. Compares proposed API changes against
+  established contracts and schemas to detect breaking changes or
+  incompatibilities.

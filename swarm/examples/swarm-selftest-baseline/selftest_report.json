@@ -1,0 +1,218 @@
+{
+  "metadata": {
+    "run_id": "example-baseline",
+    "timestamp": "2025-11-30T14:32:15Z",
+    "hostname": "demo-swarm-dev",
+    "platform": "linux",
+    "git_branch": "main",
+    "git_commit": "abc123def456",
+    "user": "developer",
+    "mode": "strict"
+  },
+  "summary": {
+    "overall_status": "GREEN",
+    "total_steps": 10,
+    "kernel_ok": true,
+    "governance_ok": true,
+    "optional_ok": true,
+    "total_passed": 10,
+    "total_failed": 0,
+    "total_skipped": 0,
+    "total_time_ms": 12450
+  },
+  "tier_breakdown": {
+    "kernel": {
+      "steps": ["core-checks"],
+      "passed": 1,
+      "failed": 0,
+      "status": "PASS"
+    },
+    "governance": {
+      "steps": [
+        "skills-governance",
+        "agents-governance",
+        "bdd",
+        "ac-status",
+        "policy-tests",
+        "devex-contract",
+        "graph-invariants"
+      ],
+      "passed": 7,
+      "failed": 0,
+      "status": "PASS"
+    },
+    "optional": {
+      "steps": [
+        "ac-coverage",
+        "extras"
+      ],
+      "passed": 2,
+      "failed": 0,
+      "status": "PASS"
+    }
+  },
+  "steps": [
+    {
+      "step_id": "core-checks",
+      "description": "Rust fmt, clippy, unit tests",
+      "tier": "kernel",
+      "severity": "critical",
+      "category": "correctness",
+      "status": "PASS",
+      "exit_code": 0,
+      "duration_ms": 3200,
+      "command": "cargo fmt --check && cargo clippy --all-targets && cargo test --lib",
+      "timestamp_start": 1701345135.0,
+      "timestamp_end": 1701345138.2
+    },
+    {
+      "step_id": "skills-governance",
+      "description": "Skills YAML validation",
+      "tier": "governance",
+      "severity": "critical",
+      "category": "governance",
+      "status": "PASS",
+      "exit_code": 0,
+      "duration_ms": 450,
+      "command": "uv run swarm/tools/validate_swarm.py --skills-only",
+      "timestamp_start": 1701345138.3,
+      "timestamp_end": 1701345138.75
+    },
+    {
+      "step_id": "agents-governance",
+      "description": "Agent validation (bijection, colors)",
+      "tier": "governance",
+      "severity": "critical",
+      "category": "governance",
+      "status": "PASS",
+      "exit_code": 0,
+      "duration_ms": 320,
+      "command": "uv run swarm/tools/validate_swarm.py --agents-only",
+      "timestamp_start": 1701345138.8,
+      "timestamp_end": 1701345139.12
+    },
+    {
+      "step_id": "bdd",
+      "description": "BDD feature file structure",
+      "tier": "governance",
+      "severity": "warning",
+      "category": "correctness",
+      "status": "PASS",
+      "exit_code": 0,
+      "duration_ms": 280,
+      "command": "uv run swarm/tools/validate_swarm.py --bdd-only",
+      "timestamp_start": 1701345139.15,
+      "timestamp_end": 1701345139.43
+    },
+    {
+      "step_id": "ac-status",
+      "description": "Acceptance criteria tracking",
+      "tier": "governance",
+      "severity": "warning",
+      "category": "governance",
+      "status": "PASS",
+      "exit_code": 0,
+      "duration_ms": 190,
+      "command": "uv run swarm/tools/ac_status.py",
+      "timestamp_start": 1701345139.45,
+      "timestamp_end": 1701345139.64
+    },
+    {
+      "step_id": "policy-tests",
+      "description": "OPA policy validation",
+      "tier": "governance",
+      "severity": "warning",
+      "category": "security",
+      "status": "PASS",
+      "exit_code": 0,
+      "duration_ms": 520,
+      "command": "uv run swarm/tools/policy_validator.py",
+      "timestamp_start": 1701345139.65,
+      "timestamp_end": 1701345140.17
+    },
+    {
+      "step_id": "devex-contract",
+      "description": "Flow/agent/skill contracts",
+      "tier": "governance",
+      "severity": "warning",
+      "category": "governance",
+      "status": "PASS",
+      "exit_code": 0,
+      "duration_ms": 310,
+      "command": "uv run swarm/tools/validate_contracts.py",
+      "timestamp_start": 1701345140.2,
+      "timestamp_end": 1701345140.51
+    },
+    {
+      "step_id": "graph-invariants",
+      "description": "Flow graph connectivity",
+      "tier": "governance",
+      "severity": "warning",
+      "category": "correctness",
+      "status": "PASS",
+      "exit_code": 0,
+      "duration_ms": 240,
+      "command": "uv run swarm/tools/validate_graph.py",
+      "timestamp_start": 1701345140.55,
+      "timestamp_end": 1701345140.79
+    },
+    {
+      "step_id": "ac-coverage",
+      "description": "Coverage thresholds",
+      "tier": "optional",
+      "severity": "info",
+      "category": "correctness",
+      "status": "PASS",
+      "exit_code": 0,
+      "duration_ms": 650,
+      "command": "cargo tarpaulin --out=Html",
+      "timestamp_start": 1701345140.8,
+      "timestamp_end": 1701345141.45
+    },
+    {
+      "step_id": "extras",
+      "description": "Experimental checks",
+      "tier": "optional",
+      "severity": "info",
+      "category": "governance",
+      "status": "PASS",
+      "exit_code": 0,
+      "duration_ms": 150,
+      "command": "uv run swarm/tools/extras_check.py",
+      "timestamp_start": 1701345141.5,
+      "timestamp_end": 1701345141.65
+    }
+  ],
+  "severity_breakdown": {
+    "critical": {
+      "passed": 1,
+      "failed": 0
+    },
+    "warning": {
+      "passed": 6,
+      "failed": 0
+    },
+    "info": {
+      "passed": 3,
+      "failed": 0
+    }
+  },
+  "category_breakdown": {
+    "security": {
+      "passed": 1,
+      "failed": 0
+    },
+    "performance": {
+      "passed": 0,
+      "failed": 0
+    },
+    "correctness": {
+      "passed": 5,
+      "failed": 0
+    },
+    "governance": {
+      "passed": 4,
+      "failed": 0
+    }
+  }
+}

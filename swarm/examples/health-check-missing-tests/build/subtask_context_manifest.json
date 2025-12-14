@@ -1,0 +1,13 @@
+{
+  "subtask_id": "health-check-missing-tests-subtask-1",
+  "description": "Add /health route handler",
+  "context_loaded": {
+    "files_read": [
+      "src/main.rs",
+      "plan/adr_current.md",
+      "plan/work_plan.md"
+    ],
+    "total_tokens": 2500
+  },
+  "timestamp": "2025-01-15T10:30:00Z"
+}

@@ -1,0 +1,20 @@
+{
+  "engine": "claude-step",
+  "mode": "stub",
+  "provider": "anthropic",
+  "model": "claude-stub",
+  "step_id": "interface",
+  "flow_key": "plan",
+  "run_id": "run-20251209-100044-rdkk8z",
+  "agent_key": "interface-designer",
+  "started_at": "2025-12-09T10:00:44.669795+00:00Z",
+  "completed_at": "2025-12-09T10:00:44.669845+00:00Z",
+  "duration_ms": 0,
+  "status": "succeeded",
+  "tokens": {
+    "prompt": 0,
+    "completion": 0,
+    "total": 0
+  },
+  "transcript_path": "llm/interface-interface-designer-claude.jsonl"
+}

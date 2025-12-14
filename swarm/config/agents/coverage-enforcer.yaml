@@ -1,0 +1,24 @@
+# Provider-neutral agent definition (Phase 1-full)
+
+key: coverage-enforcer
+
+flows:
+  - gate
+
+category: verification
+color: blue
+source: project/user
+
+short_role: Verify test coverage meets thresholds
+
+model: inherit
+
+outputs:
+  - path: RUN_BASE/gate/coverage_audit.md
+    format: markdown
+
+tags:
+  - flow-4
+  - gate
+  - verification
+  - testing

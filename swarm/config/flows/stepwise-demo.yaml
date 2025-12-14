@@ -1,0 +1,65 @@
+# Flow 7 - Stepwise Demo (Testing)
+# A 10-step demo flow for testing stepwise execution backends
+
+key: stepwise-demo
+title: "Flow 7 - Stepwise Demo (Testing)"
+description: "A 10-step demo flow for testing stepwise execution backends. Exercises different agent types across a structured workflow."
+
+teaching:
+  title: "Stepwise Demo: Testing Backend Execution"
+  summary: "This flow is designed for testing stepwise execution backends. It provides a controlled 10-step sequence using diverse agents to validate orchestration, context passing, and state management."
+
+steps:
+  - id: gather_context
+    agents:
+      - signal-normalizer
+    role: "Gather and normalize input context for the demo workflow."
+
+  - id: analyze
+    agents:
+      - problem-framer
+    role: "Analyze the gathered context and frame the problem statement."
+
+  - id: draft_requirements
+    agents:
+      - requirements-author
+    role: "Draft functional and non-functional requirements based on the analysis."
+
+  - id: review_requirements
+    agents:
+      - requirements-critic
+    role: "Review requirements for completeness and testability."
+
+  - id: propose_options
+    agents:
+      - design-optioneer
+    role: "Propose design options based on validated requirements."
+
+  - id: document_decision
+    agents:
+      - adr-author
+    role: "Document the architectural decision in ADR format."
+
+  - id: plan_tests
+    agents:
+      - test-strategist
+    role: "Plan the test strategy and coverage approach."
+
+  - id: implement
+    agents:
+      - code-implementer
+    role: "Implement the solution according to the ADR and test plan."
+
+  - id: review_code
+    agents:
+      - code-critic
+    role: "Review the implementation for ADR compliance and quality."
+
+  - id: final_review
+    agents:
+      - self-reviewer
+    role: "Perform final review and generate build receipt."
+
+cross_cutting:
+  - clarifier
+  - gh-reporter

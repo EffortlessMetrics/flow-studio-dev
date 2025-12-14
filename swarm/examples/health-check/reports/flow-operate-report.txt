@@ -1,0 +1,14 @@
+Flow: flow-operate
+File: C:\Code\Swarm\demo-swarm-dev\swarm\flows\flow-operate.md
+Steps parsed: 6
+
+Step 1 artifacts:
+  - observability_spec.md: OK
+  - deployment_verification.md: OK
+Step 2 artifacts:
+  - regression_report.md: OK
+Step 3 artifacts:
+  - flow_history.json: OK
+  - flow_timeline.md: OK
+Step 4 artifacts:
+  - playbook_update.md: OK

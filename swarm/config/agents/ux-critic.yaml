@@ -1,0 +1,13 @@
+# Utility agent for Flow Studio UX review
+key: ux-critic
+
+flows:
+  - utility
+
+category: critic
+color: red
+source: project/user
+
+short_role: Inspect Flow Studio screens and produce structured JSON critiques.
+
+model: inherit

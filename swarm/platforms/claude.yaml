@@ -1,0 +1,31 @@
+name: claude-code
+description: >
+  Claude Code agent/command adapter profile for Flow Studio.
+
+platform_key: claude
+
+agents_dir: .claude/agents
+commands_dir: .claude/commands
+
+frontmatter:
+  allowed_keys:
+    - name
+    - description
+    - model
+    - color
+    - skills
+    - tools
+    - permissionMode
+
+  # Mapping from config fields -> frontmatter keys
+  mappings:
+    key: name              # config.key -> frontmatter.name
+    short_role: description
+    model: model
+    color: color
+
+# Model mapping: tier -> concrete model string
+model_tier_fast: haiku
+model_tier_balanced: sonnet
+model_tier_deep: opus
+model_tier_fallback: sonnet

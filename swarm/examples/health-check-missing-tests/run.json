@@ -1,0 +1,5 @@
+{
+  "title": "Health Check - Missing Tests",
+  "description": "Build completed but required test artifacts are absent; gate shows degraded status and bounces back to build.",
+  "tags": ["scenario", "tests-missing", "bounce-back"]
+}

@@ -1,0 +1,7 @@
+# Data transformer agent
+
+key: data-transformer
+category: implementation
+color: green
+short_role: "Transform and normalize raw data into standard format."
+model: inherit

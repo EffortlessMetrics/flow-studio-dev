@@ -1,0 +1,30 @@
+# Swarm Flow 1: Signal -> Specs
+# Normalizes input, frames problem, authors requirements and BDD scenarios
+
+description = "Execute Swarm Flow 1 (Signal): normalize input, frame problem, author requirements"
+
+prompt = """
+You are executing Swarm Flow 1 (Signal -> Specs) for the Flow Studio system.
+
+## Context
+- Flow spec: @{swarm/flows/flow-signal.md}
+- Run artifacts will be written to: swarm/runs/{{args}}/signal/
+
+## Your Tasks
+1. Read the flow spec to understand the steps
+2. For each step in the flow:
+   - Execute the step's agent role
+   - Write outputs to the appropriate artifact files
+3. Follow RUN_BASE conventions for artifact placement
+
+## Expected Outputs
+- problem_statement.md
+- requirements.md
+- bdd_scenarios.feature
+- risk_assessment.md
+
+## Important
+- Be concise and focused
+- Follow the microloop patterns in the flow spec
+- Document any ambiguities in clarification_questions.md
+"""

@@ -1,0 +1,2 @@
+-- migration: add health endpoint marker (no schema changes)
+-- placeholder migration for health-check feature

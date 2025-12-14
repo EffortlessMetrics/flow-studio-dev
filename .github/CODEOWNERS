@@ -1,0 +1,15 @@
+# CODEOWNERS for Flow Studio repository
+#
+# Changes to these paths require review from specified owners.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Flow Studio frontend + backend
+swarm/tools/flow_studio_fastapi.py        @EffortlessSteven
+swarm/tools/flow_studio_ui/               @EffortlessSteven
+
+# Flow Studio documentation & handover
+docs/FLOW_STUDIO*.md                      @EffortlessSteven
+docs/MAINTAINING_FLOW_STUDIO.md           @EffortlessSteven
+
+# Runbooks for Flow Studio
+swarm/runbooks/*flowstudio*               @EffortlessSteven

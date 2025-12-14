@@ -1,0 +1,41 @@
+Flow: flow-signal
+File: C:\Code\Swarm\demo-swarm-dev\swarm\flows\flow-signal.md
+Steps parsed: 19
+
+Step 1 artifacts:
+  - issue_normalized.md: OK
+Step 2 artifacts:
+  - internal_research.md: OK
+Step 3 artifacts:
+  - external_research.md: OK
+Step 4 artifacts:
+  - context_brief.md: OK
+Step 5 artifacts:
+  - doc_research.md: OK
+Step 6 artifacts:
+  - related_links.json: OK
+Step 7 artifacts:
+  - problem_statement.md: OK
+Step 8 artifacts:
+  - clarification_questions.md: OK
+Step 9 artifacts:
+  - gap_research.md: OK
+Step 10 artifacts:
+  - gap_research.md: OK
+  - doc_research.md: OK
+Step 11 artifacts:
+  - problem_statement.md: OK
+Step 12 artifacts:
+  - requirements_functional.md: OK
+  - requirements_constraints.md: OK
+Step 13 artifacts:
+  - requirements_check.md: OK
+Step 14 artifacts:
+  - early_code_alignment.md: OK
+Step 15 artifacts:
+  - early_risk_assessment.md: OK
+Step 16 artifacts:
+  - features/*.feature: OK
+  - example_matrix.md: OK
+Step 17 artifacts:
+  - clarification_questions_final.md: OK

@@ -1,0 +1,23 @@
+# Provider-neutral agent definition (Phase 1-full)
+
+key: smoke-verifier
+
+flows:
+  - deploy
+
+category: verification
+color: blue
+source: project/user
+
+short_role: Run health checks and verify artifacts
+
+model: haiku
+
+outputs:
+  - path: RUN_BASE/deploy/verification_report.md
+    format: markdown
+
+tags:
+  - flow-5
+  - deploy
+  - verification

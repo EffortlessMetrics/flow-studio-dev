@@ -1,0 +1,42 @@
+{
+  "timestamp": "2025-11-30T14:32:15Z",
+  "governance": {
+    "selftest": {
+      "status": "GREEN",
+      "kernel_ok": true,
+      "governance_ok": true,
+      "optional_ok": true,
+      "summary": {
+        "total": 10,
+        "passed": 10,
+        "failed": 0,
+        "skipped": 0
+      },
+      "by_severity": {
+        "critical": {
+          "passed": 1,
+          "failed": 0
+        },
+        "warning": {
+          "passed": 6,
+          "failed": 0
+        },
+        "info": {
+          "passed": 3,
+          "failed": 0
+        }
+      },
+      "tier_status": {
+        "kernel": "PASS",
+        "governance": "PASS",
+        "optional": "PASS"
+      }
+    }
+  },
+  "metadata": {
+    "run_id": "example-baseline",
+    "git_branch": "main",
+    "git_commit": "abc123def456",
+    "hostname": "demo-swarm-dev"
+  }
+}

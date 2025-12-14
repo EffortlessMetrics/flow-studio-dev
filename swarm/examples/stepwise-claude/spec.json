@@ -1,0 +1,10 @@
+{
+  "flow_keys": [
+    "signal",
+    "plan"
+  ],
+  "profile_id": null,
+  "backend": "claude-step-orchestrator",
+  "initiator": "demo-stepwise-tool",
+  "params": {}
+}

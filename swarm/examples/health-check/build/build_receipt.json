@@ -1,0 +1,13 @@
+{
+  "feature": "health-check",
+  "tests_run": 1,
+  "tests_passed": 1,
+  "overall_status": "pass",
+  "artifacts": ["self_review.md", "test_summary.md", "build_receipt.json"]
+}
+{
+  "requirements_covered": ["FR1", "FR2", "FR3"],
+  "tests_run": 1,
+  "mutation_status": "not-run",
+  "overall_status": "pass"
+}

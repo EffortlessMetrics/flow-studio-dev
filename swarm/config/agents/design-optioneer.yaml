@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: design-optioneer
+flows:
+  - plan
+category: design
+color: purple
+source: project/user
+short_role: "Propose 2-3 architecture options with trade-offs → design_options.md."
+model: inherit

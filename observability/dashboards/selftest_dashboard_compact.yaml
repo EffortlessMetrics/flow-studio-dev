@@ -1,0 +1,259 @@
+# Selftest Governance Health Dashboard (Compact YAML Format)
+# Compatible with Datadog, New Relic, and other observability platforms
+# This dashboard provides tier-aware monitoring of the selftest system
+
+title: "Selftest Governance Health"
+description: "Comprehensive monitoring of selftest system across environments"
+tags:
+  - selftest
+  - platform
+  - governance
+refresh_interval: 60s
+time_range:
+  from: now-7d
+  to: now
+
+# Template variables for filtering
+template_variables:
+  - name: environment
+    prefix: environment
+    default: "*"
+    available_values:
+      - dev
+      - staging
+      - prod
+
+# Dashboard layout (4 panels as per spec)
+widgets:
+  # Panel 1: Run Success Rate (%)
+  - title: "Run Success Rate (%)"
+    type: timeseries
+    definition:
+      requests:
+        - q: "avg:selftest.governance.pass_rate{environment:$environment} by {environment}"
+          display_type: line
+          style:
+            palette: green
+            line_type: solid
+            line_width: normal
+      yaxis:
+        label: "Pass Rate (%)"
+        min: 0
+        max: 100
+        include_zero: true
+      markers:
+        - value: 99
+          display_type: error dashed
+          label: "SLO Target (99%)"
+        - value: 95
+          display_type: warning dashed
+          label: "Warning Threshold (95%)"
+      title_size: 16
+      title_align: left
+      show_legend: true
+      legend_layout: auto
+      legend_columns:
+        - value
+        - avg
+        - sum
+    layout:
+      x: 0
+      y: 0
+      width: 12
+      height: 4
+
+  # Panel 2: Step Failure Distribution (by step_id)
+  - title: "Step Failure Distribution (Top 5)"
+    type: toplist
+    definition:
+      requests:
+        - q: "top(sum:selftest.step.failures.total{environment:$environment}.as_rate() by {step_id}, 5, 'sum', 'desc')"
+          conditional_formats:
+            - comparator: ">"
+              value: 0.1
+              palette: white_on_red
+            - comparator: ">"
+              value: 0.05
+              palette: white_on_yellow
+            - comparator: "<="
+              value: 0.05
+              palette: white_on_green
+      title_size: 16
+      title_align: left
+    layout:
+      x: 0
+      y: 4
+      width: 6
+      height: 4
+
+  # Panel 3: Run Duration Distribution (P50, P95, P99)
+  - title: "Run Duration Distribution (Percentiles)"
+    type: timeseries
+    definition:
+      requests:
+        - q: "p50:selftest.run.duration_seconds{environment:$environment}"
+          display_type: line
+          style:
+            palette: blue
+            line_type: solid
+          metadata:
+            - alias: "P50"
+        - q: "p95:selftest.run.duration_seconds{environment:$environment}"
+          display_type: line
+          style:
+            palette: yellow
+            line_type: solid
+          metadata:
+            - alias: "P95"
+        - q: "p99:selftest.run.duration_seconds{environment:$environment}"
+          display_type: line
+          style:
+            palette: red
+            line_type: solid
+          metadata:
+            - alias: "P99"
+      yaxis:
+        label: "Duration (seconds)"
+        min: 0
+        include_zero: true
+      markers:
+        - value: 120
+          display_type: error dashed
+          label: "SLO Target (120s)"
+        - value: 90
+          display_type: warning dashed
+          label: "Warning Threshold (90s)"
+      title_size: 16
+      title_align: left
+      show_legend: true
+      legend_layout: auto
+    layout:
+      x: 6
+      y: 4
+      width: 12
+      height: 4
+
+  # Panel 4: Active Degradations (by severity)
+  - title: "Active Degradations (by Severity)"
+    type: query_value
+    definition:
+      requests:
+        - q: "sum:selftest.degradations.active{environment:$environment} by {severity}"
+          aggregator: last
+          conditional_formats:
+            - comparator: ">"
+              value: 0
+              palette: white_on_red
+            - comparator: "="
+              value: 0
+              palette: white_on_green
+      autoscale: true
+      precision: 0
+      title_size: 16
+      title_align: left
+    layout:
+      x: 0
+      y: 8
+      width: 6
+      height: 2
+
+  # Additional Panel: Degradation Trend Over Time
+  - title: "Degradation Trend (Last 24h)"
+    type: timeseries
+    definition:
+      requests:
+        - q: "sum:selftest.degradations.total{environment:$environment}.as_rate() by {severity}"
+          display_type: bars
+          style:
+            palette: warm
+      yaxis:
+        label: "Degradations per second"
+        include_zero: true
+      title_size: 16
+      title_align: left
+      show_legend: true
+    layout:
+      x: 6
+      y: 8
+      width: 6
+      height: 4
+
+  # SLO Compliance Indicators
+  - title: "SLO Compliance: Availability"
+    type: query_value
+    definition:
+      requests:
+        - q: "(sum:selftest.step.total{environment:prod}.as_count() - sum:selftest.step.failures.total{environment:prod}.as_count()) / sum:selftest.step.total{environment:prod}.as_count() * 100"
+          aggregator: avg
+          conditional_formats:
+            - comparator: ">="
+              value: 99
+              palette: white_on_green
+            - comparator: "<"
+              value: 99
+              palette: white_on_red
+      autoscale: false
+      custom_unit: "%"
+      precision: 2
+      title: "Availability SLO: 99% Target"
+      title_size: 16
+      title_align: left
+    layout:
+      x: 12
+      y: 0
+      width: 4
+      height: 2
+
+  - title: "SLO Compliance: Performance"
+    type: query_value
+    definition:
+      requests:
+        - q: "p95:selftest.run.duration_seconds{environment:prod}"
+          aggregator: avg
+          conditional_formats:
+            - comparator: "<="
+              value: 120
+              palette: white_on_green
+            - comparator: ">"
+              value: 120
+              palette: white_on_red
+      autoscale: false
+      custom_unit: "s"
+      precision: 1
+      title: "Performance SLO: P95 <= 120s"
+      title_size: 16
+      title_align: left
+    layout:
+      x: 16
+      y: 0
+      width: 4
+      height: 2
+
+  - title: "SLO Compliance: Degradations"
+    type: query_value
+    definition:
+      requests:
+        - q: "max:selftest.degradations.total{environment:prod}.as_count().rollup(sum, 86400)"
+          aggregator: max
+          conditional_formats:
+            - comparator: "<="
+              value: 3
+              palette: white_on_green
+            - comparator: ">"
+              value: 3
+              palette: white_on_red
+      autoscale: false
+      precision: 0
+      title: "Degradation SLO: <= 3 per 24h"
+      title_size: 16
+      title_align: left
+    layout:
+      x: 20
+      y: 0
+      width: 4
+      height: 2
+
+# Notification settings
+notify_list: []
+notify_no_data: false
+reflow_type: fixed

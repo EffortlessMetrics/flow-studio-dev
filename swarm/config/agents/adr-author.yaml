@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: adr-author
+flows:
+  - plan
+category: design
+color: purple
+source: project/user
+short_role: "Write ADR for chosen design → adr.md."
+model: inherit

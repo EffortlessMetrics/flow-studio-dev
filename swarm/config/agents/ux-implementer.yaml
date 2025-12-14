@@ -1,0 +1,13 @@
+# Utility agent for Flow Studio UX implementation
+key: ux-implementer
+
+flows:
+  - utility
+
+category: implementation
+color: green
+source: project/user
+
+short_role: Apply UX critique fixes to Flow Studio code and run tests.
+
+model: inherit

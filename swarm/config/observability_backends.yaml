@@ -1,0 +1,83 @@
+# Observability Backends Configuration
+#
+# This file configures where selftest metrics and events are emitted.
+# Multiple backends can be enabled simultaneously.
+#
+# Design philosophy: Graceful degradation
+# - If a backend is enabled but credentials are missing, it's skipped (logged but non-blocking)
+# - All backends are optional except logs (always on)
+# - Each backend implements the ObservabilityBackend interface
+
+version: "1.0"
+
+backends:
+  # Prometheus - Metrics exposed via HTTP endpoint or pushed to pushgateway
+  prometheus:
+    enabled: true
+    # If pushgateway_url is set, metrics are pushed to the gateway
+    # Otherwise, metrics are served on localhost:serve_port for scraping
+    pushgateway_url: null  # Example: "http://localhost:9091"
+    serve_port: 8000
+    serve_addr: "127.0.0.1"
+    # Job name for Prometheus metrics
+    job_name: "selftest"
+    # Additional labels applied to all metrics
+    labels:
+      environment: "local"
+      team: "platform"
+
+  # Datadog - Cloud-based monitoring and metrics
+  datadog:
+    enabled: false  # Requires DATADOG_API_KEY environment variable
+    api_endpoint: "https://api.datadoghq.com"
+    # API key can be set via DATADOG_API_KEY env var or left null (will be auto-detected)
+    api_key: null
+    # Site can be 'datadoghq.com', 'datadoghq.eu', 'us3.datadoghq.com', etc.
+    site: "datadoghq.com"
+    # Tags applied to all metrics and events
+    tags:
+      - "service:selftest"
+      - "team:platform"
+      - "repo:flow-studio"
+    # Metric prefix for all emitted metrics
+    metric_prefix: "swarm.selftest"
+
+  # AWS CloudWatch - Cloud-based monitoring for AWS environments
+  cloudwatch:
+    enabled: false  # Requires AWS credentials (boto3 default credential chain)
+    # Namespace for CloudWatch metrics
+    namespace: "SelfTest"
+    # AWS region (uses AWS_DEFAULT_REGION or boto3 default if not set)
+    region: null  # Example: "us-east-1"
+    # Dimensions applied to all metrics
+    dimensions:
+      - name: "Environment"
+        value: "local"
+      - name: "Service"
+        value: "selftest"
+    # Storage resolution (1 = standard, 60 = high resolution)
+    storage_resolution: 60
+
+  # JSON logs - Structured logging to stdout or file
+  logs:
+    enabled: false  # Disabled by default to avoid mixing with human-readable output
+    # Format: 'json' (structured JSON lines) or 'text' (human-readable)
+    format: "json"
+    # Output: 'stdout', 'stderr', or a file path (e.g., '/tmp/selftest_events.log')
+    # Note: If enabled with stdout, JSON lines will mix with human-readable output
+    output: "selftest_events.log"
+    # Log level: 'DEBUG', 'INFO', 'WARNING', 'ERROR'
+    level: "INFO"
+    # Include full step output in logs (can be verbose)
+    include_output: false
+    # Timestamp format
+    timestamp_format: "iso8601"  # or 'unix'
+
+# Global settings
+global:
+  # Enable/disable all observability backends
+  enabled: true
+  # Fail fast if any backend initialization fails (default: false = graceful degradation)
+  strict_mode: false
+  # Timeout for backend operations (seconds)
+  timeout: 5.0

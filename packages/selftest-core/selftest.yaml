@@ -1,0 +1,32 @@
+# Example selftest configuration for the selftest-core package
+mode: strict
+
+steps:
+  - id: lint
+    tier: kernel
+    command: uv run ruff check src/
+    description: Python linting
+    severity: critical
+    category: correctness
+
+  - id: typecheck
+    tier: governance
+    command: echo "Type checking (placeholder)"
+    description: Type checking
+    severity: warning
+    category: correctness
+    allow_fail_in_degraded: true
+
+  - id: test
+    tier: kernel
+    command: echo "Test check (placeholder - use from repo root for real tests)"
+    description: Unit tests (placeholder)
+    dependencies:
+      - lint
+
+  - id: coverage
+    tier: optional
+    command: echo "Coverage check (placeholder)"
+    description: Coverage threshold
+    severity: info
+    category: governance

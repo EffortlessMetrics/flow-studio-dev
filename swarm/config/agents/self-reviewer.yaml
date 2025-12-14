@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: self-reviewer
+flows:
+  - build
+category: verification
+color: blue
+source: project/user
+short_role: "Final review → self_review.md, build_receipt.json."
+model: inherit

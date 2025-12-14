@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: work-planner
+flows:
+  - plan
+category: design
+color: purple
+source: project/user
+short_role: "Break design into subtasks, define rollout strategy → work_plan.md."
+model: inherit

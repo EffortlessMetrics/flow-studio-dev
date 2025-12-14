@@ -1,0 +1,222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flow-studio.effortlessmetrics.io/schemas/flow_profile.schema.json",
+  "title": "Swarm Profile",
+  "description": "Schema for defining swarm profiles that capture a complete snapshot of flow definitions, configurations, and agent settings. Used for versioning, sharing, and restoring swarm configurations.",
+  "type": "object",
+  "required": ["kind", "version", "meta", "flows_yaml", "flow_configs", "agent_configs"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "swarm_profile",
+      "description": "Document type identifier. Must be 'swarm_profile'."
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2,
+      "description": "Schema version number. Version 1 is baseline, version 2 adds runtime_settings.",
+      "default": 1
+    },
+    "meta": {
+      "$ref": "#/$defs/ProfileMeta"
+    },
+    "flows_yaml": {
+      "type": "string",
+      "description": "Full contents of swarm/config/flows.yaml inlined as a string. Contains the canonical definition of SDLC flow ordering and metadata.",
+      "minLength": 1
+    },
+    "flow_configs": {
+      "type": "array",
+      "description": "Array of individual flow configuration files with their contents inlined.",
+      "items": {
+        "$ref": "#/$defs/FlowConfig"
+      },
+      "minItems": 1
+    },
+    "agent_configs": {
+      "type": "array",
+      "description": "Array of agent configuration files with their contents inlined.",
+      "items": {
+        "$ref": "#/$defs/AgentConfig"
+      },
+      "minItems": 1
+    },
+    "runtime_settings": {
+      "$ref": "#/$defs/RuntimeSettings",
+      "description": "Optional runtime configuration overrides (v2.4.0)"
+    }
+  },
+  "$defs": {
+    "ProfileMeta": {
+      "type": "object",
+      "description": "Metadata about the swarm profile.",
+      "required": ["id", "label"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Profile identifier. Should match the filename stem (e.g., 'default' for default.yaml).",
+          "pattern": "^[a-z][a-z0-9_-]*$",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable display name for the profile.",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "description": {
+          "type": "string",
+          "description": "Purpose and use case description for this profile.",
+          "maxLength": 1024
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when the profile was created."
+        },
+        "created_by": {
+          "type": "string",
+          "description": "Author or system that created this profile (e.g., username, agent name, or 'system').",
+          "maxLength": 128
+        },
+        "tags": {
+          "type": "array",
+          "description": "Optional tags for categorizing profiles.",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]*$"
+          },
+          "uniqueItems": true
+        },
+        "base_profile": {
+          "type": "string",
+          "description": "ID of the profile this one was derived from, if any.",
+          "pattern": "^[a-z][a-z0-9_-]*$"
+        }
+      }
+    },
+    "FlowConfig": {
+      "type": "object",
+      "description": "A single flow configuration file with its contents.",
+      "required": ["key", "path", "yaml"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Flow key identifier (e.g., 'signal', 'plan', 'build', 'gate', 'deploy', 'wisdom').",
+          "pattern": "^[a-z][a-z0-9_-]*$",
+          "enum": ["signal", "plan", "build", "gate", "deploy", "wisdom"]
+        },
+        "path": {
+          "type": "string",
+          "description": "Original file path relative to repository root.",
+          "pattern": "^swarm/config/flows/[a-z][a-z0-9_-]*\\.yaml$"
+        },
+        "yaml": {
+          "type": "string",
+          "description": "Full YAML contents of the flow configuration file.",
+          "minLength": 1
+        },
+        "checksum": {
+          "type": "string",
+          "description": "Optional SHA-256 checksum of the yaml contents for integrity verification.",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "AgentConfig": {
+      "type": "object",
+      "description": "A single agent configuration file with its contents.",
+      "required": ["key", "path", "yaml"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Agent key identifier (e.g., 'context-loader', 'test-author').",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "path": {
+          "type": "string",
+          "description": "Original file path relative to repository root.",
+          "pattern": "^swarm/config/agents/[a-z][a-z0-9-]*\\.yaml$"
+        },
+        "yaml": {
+          "type": "string",
+          "description": "Full YAML contents of the agent configuration file.",
+          "minLength": 1
+        },
+        "checksum": {
+          "type": "string",
+          "description": "Optional SHA-256 checksum of the yaml contents for integrity verification.",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "RuntimeSettings": {
+      "type": "object",
+      "description": "Runtime configuration overrides stored in the profile (v2.4.0).",
+      "additionalProperties": false,
+      "properties": {
+        "context_budgets": {
+          "$ref": "#/$defs/ContextBudgetOverride"
+        }
+      }
+    },
+    "ContextBudgetOverride": {
+      "type": "object",
+      "description": "Optional context budget overrides. Omitted fields inherit from parent level.",
+      "additionalProperties": false,
+      "properties": {
+        "context_budget_chars": {
+          "type": "integer",
+          "minimum": 10000,
+          "maximum": 1000000,
+          "description": "Total history budget in characters (~4 chars per token)"
+        },
+        "history_max_recent_chars": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 500000,
+          "description": "Max chars for the most recent step"
+        },
+        "history_max_older_chars": {
+          "type": "integer",
+          "minimum": 500,
+          "maximum": 100000,
+          "description": "Max chars for each older step"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "kind": "swarm_profile",
+      "version": 1,
+      "meta": {
+        "id": "default",
+        "label": "Default SDLC Profile",
+        "description": "Standard six-flow SDLC configuration for Flow Studio.",
+        "created_at": "2025-01-15T10:30:00Z",
+        "created_by": "system",
+        "tags": ["standard", "sdlc"]
+      },
+      "flows_yaml": "version: 1\nflows:\n  - key: signal\n    index: 1\n    title: \"Signal -> Spec\"\n",
+      "flow_configs": [
+        {
+          "key": "signal",
+          "path": "swarm/config/flows/signal.yaml",
+          "yaml": "key: signal\ntitle: \"Flow 1 - Signal\"\n"
+        }
+      ],
+      "agent_configs": [
+        {
+          "key": "context-loader",
+          "path": "swarm/config/agents/context-loader.yaml",
+          "yaml": "key: context-loader\nflows:\n  - build\n"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: risk-analyst
+flows:
+  - 1, 2, 4, 6
+category: analytics
+color: orange
+source: project/user
+short_role: "Identify risk patterns (security, compliance, data, performance)."
+model: inherit

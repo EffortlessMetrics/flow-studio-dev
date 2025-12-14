@@ -1,0 +1,28 @@
+Flow: flow-plan
+File: C:\Code\Swarm\demo-swarm-dev\swarm\flows\flow-plan.md
+Steps parsed: 15
+
+Step 1 artifacts:
+  - impact_map.json: OK
+Step 2 artifacts:
+  - iac_surface_map.md: OK
+Step 5 artifacts:
+  - design_options.md: OK
+Step 6 artifacts:
+  - adr_current.md: OK
+Step 7 artifacts:
+  - api_contracts.yaml: OK
+  - interface_spec.md: OK
+Step 8 artifacts:
+  - data_spec.md: OK
+  - migrations/*.sql: OK
+Step 9 artifacts:
+  - observability_spec.md: OK
+Step 10 artifacts:
+  - test_plan.md: OK
+Step 11 artifacts:
+  - policy_plan.md: OK
+Step 12 artifacts:
+  - implementation_plan.md: OK
+Step 13 artifacts:
+  - design_feasibility.md: OK

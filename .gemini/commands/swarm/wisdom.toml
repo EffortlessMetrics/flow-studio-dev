@@ -1,0 +1,33 @@
+# Swarm Flow 6: Prod -> Wisdom
+# Analyze artifacts, detect regressions, extract learnings
+
+description = "Execute Swarm Flow 6 (Wisdom): analyze, learn, close feedback loops"
+
+prompt = """
+You are executing Swarm Flow 6 (Prod -> Wisdom) for the Flow Studio system.
+
+## Context
+- Flow spec: @{swarm/flows/flow-wisdom.md}
+- All prior flow artifacts: @{swarm/runs/{{args}}/}
+- Run artifacts will be written to: swarm/runs/{{args}}/wisdom/
+
+## Your Tasks
+1. Audit all artifacts from Flows 1-5
+2. Analyze test results and detect regressions
+3. Build flow timeline and history
+4. Synthesize learnings and patterns
+5. Create feedback actions (issues, doc updates)
+6. Report summary
+
+## Expected Outputs
+- artifact_audit.md
+- regression_report.md
+- flow_history.json
+- learnings.md
+- feedback_actions.md
+
+## Important
+- Close the feedback loop by suggesting improvements
+- Identify patterns that should inform future flows
+- Create actionable recommendations
+"""

@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: signal-normalizer
+flows:
+  - signal
+category: shaping
+color: yellow
+source: project/user
+short_role: "Parse raw input, find related context → issue_normalized.md, context_brief.md."
+model: inherit

@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: code-critic
+flows:
+  - build
+category: critic
+color: red
+source: project/user
+short_role: "Harsh review vs ADR/contracts → code_critique.md."
+model: inherit

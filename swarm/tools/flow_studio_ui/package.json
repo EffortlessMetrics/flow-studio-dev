@@ -1,0 +1,12 @@
+{
+  "name": "flow-studio-ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "ts-build": "tsc",
+    "ts-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

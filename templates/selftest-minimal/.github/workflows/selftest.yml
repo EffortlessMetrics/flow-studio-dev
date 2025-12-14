@@ -1,0 +1,46 @@
+name: Selftest
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv pip install --system selftest-core
+          # Install tools used by selftest steps (customize as needed)
+          uv pip install --system ruff pytest pytest-cov
+
+      - name: Run KERNEL checks (fast, must pass)
+        run: selftest run --kernel-only
+
+      - name: Run full selftest (all tiers)
+        run: selftest run
+
+      - name: Generate JSON report
+        if: always()
+        run: selftest run --json-v2 > selftest_report.json || true
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selftest-report
+          path: selftest_report.json

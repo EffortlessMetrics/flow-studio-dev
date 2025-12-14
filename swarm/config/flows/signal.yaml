@@ -1,0 +1,161 @@
+key: signal
+title: "Flow 1 - Signal → Spec (Shaping)"
+description: "Raw input → problem statement, requirements, BDD scenarios, early risk assessment."
+
+teaching:
+  title: "Signal to Spec: Shaping Raw Input into Requirements"
+  summary: "This flow transforms vague signals (bug reports, feature requests, stakeholder conversations) into structured, testable requirements with BDD scenarios. The key pattern is the adversarial microloop between author and critic."
+
+steps:
+  - id: normalize
+    agents:
+      - signal-normalizer
+    role: "Parse raw input, find related context → issue_normalized.md, context_brief.md."
+    routing:
+      kind: linear
+      next: frame
+    teaching_notes:
+      inputs:
+        - "raw issue/ticket/conversation"
+        - "existing codebase context"
+      outputs:
+        - "RUN_BASE/signal/issue_normalized.md"
+        - "RUN_BASE/signal/context_brief.md"
+      emphasizes:
+        - "extract structured data from unstructured input"
+        - "identify related code, docs, and history"
+        - "normalize ambiguous language"
+      constraints:
+        - "do not interpret requirements"
+        - "preserve original intent"
+
+  - id: frame
+    agents:
+      - problem-framer
+    role: "Synthesize normalized signal → problem_statement.md with clear success criteria."
+    routing:
+      kind: linear
+      next: author_reqs
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/signal/issue_normalized.md"
+        - "RUN_BASE/signal/context_brief.md"
+      outputs:
+        - "RUN_BASE/signal/problem_statement.md"
+      emphasizes:
+        - "define clear success criteria"
+        - "identify stakeholders and constraints"
+        - "frame problem, not solution"
+      constraints:
+        - "do not prescribe implementation"
+        - "stay solution-agnostic"
+
+  - id: author_reqs
+    agents:
+      - requirements-author
+    role: "Write functional + non-functional requirements → requirements.md following structured template."
+    teaching_note: "The requirements author writes the first draft. Watch how functional and non-functional requirements are separated and structured for testability."
+    teaching_highlight: true
+    routing:
+      kind: linear
+      next: critique_reqs
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/signal/problem_statement.md"
+        - "RUN_BASE/signal/context_brief.md"
+        - "RUN_BASE/signal/requirements_critique.md"
+      outputs:
+        - "RUN_BASE/signal/requirements.md"
+      emphasizes:
+        - "separate functional from non-functional"
+        - "ensure testability of each requirement"
+        - "use structured template"
+        - "address critique feedback if present"
+      constraints:
+        - "requirements must be verifiable"
+        - "avoid implementation details"
+
+  - id: critique_reqs
+    agents:
+      - requirements-critic
+    role: "Harsh review of requirements vs completeness, feasibility, testability → requirements_critique.md."
+    teaching_note: "MICROLOOP: The critic provides harsh feedback but never fixes. The author-critic loop continues until Status=VERIFIED or can_further_iteration_help=no. This adversarial pattern catches ambiguities early."
+    teaching_highlight: true
+    routing:
+      kind: microloop
+      loop_target: author_reqs
+      loop_condition_field: status
+      loop_success_values:
+        - "VERIFIED"
+        - "verified"
+      next: author_bdd
+      max_iterations: 3
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/signal/requirements.md"
+        - "RUN_BASE/signal/problem_statement.md"
+      outputs:
+        - "RUN_BASE/signal/requirements_critique.md"
+      emphasizes:
+        - "check completeness against problem statement"
+        - "verify testability of each requirement"
+        - "identify ambiguities and gaps"
+        - "assess feasibility"
+      constraints:
+        - "never fix, only critique"
+        - "provide clear Status and can_further_iteration_help"
+
+  - id: author_bdd
+    agents:
+      - bdd-author
+    role: "Turn verified requirements into executable BDD scenarios → features/*.feature."
+    teaching_note: "BDD scenarios become the executable contract that drives Flow 3 testing. Well-written Gherkin here saves significant rework downstream."
+    teaching_highlight: true
+    routing:
+      kind: linear
+      next: scope
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/signal/requirements.md"
+        - "RUN_BASE/signal/problem_statement.md"
+      outputs:
+        - "RUN_BASE/signal/bdd_scenarios.md"
+        - "features/*.feature"
+      emphasizes:
+        - "map each requirement to scenarios"
+        - "use Given-When-Then format"
+        - "cover happy path and edge cases"
+        - "make scenarios executable"
+      constraints:
+        - "scenarios must be testable"
+        - "avoid implementation assumptions"
+
+  - id: scope
+    agents:
+      - scope-assessor
+    role: "Assess stakeholders, constraints, risks, effort estimate → scope_assessment.md."
+    routing:
+      kind: linear
+      # Final step - no next, flow is complete
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/signal/requirements.md"
+        - "RUN_BASE/signal/bdd_scenarios.md"
+        - "RUN_BASE/signal/problem_statement.md"
+        - "RUN_BASE/signal/context_brief.md"
+      outputs:
+        - "RUN_BASE/signal/scope_assessment.md"
+        - "RUN_BASE/signal/risk_assessment.md"
+      emphasizes:
+        - "identify stakeholders and dependencies"
+        - "estimate effort and complexity"
+        - "surface risks early"
+        - "define scope boundaries"
+      constraints:
+        - "be conservative with estimates"
+        - "document assumptions explicitly"
+
+cross_cutting:
+  - clarifier
+  - risk-analyst
+  - gh-reporter

@@ -1,0 +1,20 @@
+{
+  "engine": "claude-step",
+  "mode": "stub",
+  "provider": "anthropic",
+  "model": "claude-stub",
+  "step_id": "test_strategy",
+  "flow_key": "plan",
+  "run_id": "run-20251209-093851-zhdxx7",
+  "agent_key": "test-strategist",
+  "started_at": "2025-12-09T09:38:51.050092+00:00Z",
+  "completed_at": "2025-12-09T09:38:51.050144+00:00Z",
+  "duration_ms": 0,
+  "status": "succeeded",
+  "tokens": {
+    "prompt": 0,
+    "completion": 0,
+    "total": 0
+  },
+  "transcript_path": "llm/test_strategy-test-strategist-claude.jsonl"
+}

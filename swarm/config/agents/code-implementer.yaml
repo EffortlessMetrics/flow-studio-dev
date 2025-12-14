@@ -1,0 +1,14 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: code-implementer
+flows:
+  - build
+category: implementation
+color: green
+source: project/user
+short_role: "Write code to pass tests, following ADR → src/*, impl_changes_summary.md."
+model: inherit
+model_tier: deep
+
+# Example: per-platform model tier overrides (flattened for simple YAML parser)
+# This agent uses 'deep' tier by default, but overrides to 'balanced' for OpenAI
+platform_openai_model_tier: balanced

@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flow-studio.effortlessmetrics.io/schemas/ux_critique.schema.json",
+  "title": "UX Critique",
+  "description": "Structured critique output from the Flow Studio UX Critic agent. Consumed by UX Implementer and logged for diff tracking.",
+  "type": "object",
+  "required": ["screen_id", "run_id", "timestamp", "issues"],
+  "properties": {
+    "screen_id": {
+      "type": "string",
+      "description": "Screen identifier from layout spec (e.g., 'flows.default')",
+      "pattern": "^[a-z]+\\.[a-z_]+$"
+    },
+    "run_id": {
+      "type": "string",
+      "description": "Review run timestamp that this critique is based on (e.g., '20251207-021530')",
+      "pattern": "^\\d{8}-\\d{6}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when this critique was generated"
+    },
+    "summary": {
+      "type": "string",
+      "description": "Brief overall assessment of the screen's UX quality (1-2 sentences)"
+    },
+    "issues": {
+      "type": "array",
+      "description": "List of identified UX issues",
+      "items": {
+        "$ref": "#/$defs/UXIssue"
+      }
+    },
+    "positive_notes": {
+      "type": "array",
+      "description": "Optional positive observations about the screen's UX",
+      "items": {
+        "type": "string"
+      }
+    },
+    "meta": {
+      "type": "object",
+      "description": "Optional metadata about the critique generation",
+      "properties": {
+        "agent_version": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "duration_ms": {
+          "type": "integer"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "UXIssue": {
+      "type": "object",
+      "required": ["id", "region", "severity", "type", "description"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for this issue within the critique (e.g., 'header-a11y-contrast')",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "region": {
+          "type": "string",
+          "description": "Region ID from the layout spec where the issue occurs (e.g., 'header', 'sidebar', 'canvas')",
+          "enum": ["header", "sdlc_bar", "sidebar", "canvas", "inspector", "modal", "global"]
+        },
+        "uiid": {
+          "type": "string",
+          "description": "Specific UIID selector if the issue is localized to a single element",
+          "pattern": "^flow_studio\\.[a-z_.]+$"
+        },
+        "severity": {
+          "type": "string",
+          "description": "Impact level of the issue",
+          "enum": ["low", "medium", "high", "critical"]
+        },
+        "type": {
+          "type": "string",
+          "description": "Category of UX issue",
+          "enum": [
+            "accessibility",
+            "layout",
+            "copy",
+            "navigation",
+            "performance",
+            "visual",
+            "interaction",
+            "consistency",
+            "responsiveness"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "description": "Clear explanation of the issue and why it matters"
+        },
+        "evidence": {
+          "type": "object",
+          "description": "Supporting evidence from the captured artifacts",
+          "properties": {
+            "dom_snippet": {
+              "type": "string",
+              "description": "Relevant HTML snippet demonstrating the issue"
+            },
+            "state_path": {
+              "type": "string",
+              "description": "JSON path in state.json relevant to the issue"
+            },
+            "screenshot_region": {
+              "type": "object",
+              "description": "Bounding box in the screenshot",
+              "properties": {
+                "x": { "type": "integer" },
+                "y": { "type": "integer" },
+                "width": { "type": "integer" },
+                "height": { "type": "integer" }
+              }
+            }
+          }
+        },
+        "suggested_changes": {
+          "type": "array",
+          "description": "Suggested file modifications to address the issue",
+          "items": {
+            "$ref": "#/$defs/SuggestedChange"
+          }
+        },
+        "references": {
+          "type": "array",
+          "description": "Links to relevant WCAG guidelines, design system docs, etc.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "url": { "type": "string", "format": "uri" }
+            }
+          }
+        }
+      }
+    },
+    "SuggestedChange": {
+      "type": "object",
+      "required": ["path", "rationale"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "File path relative to repo root that needs modification",
+          "pattern": "^swarm/tools/flow_studio_ui/.*|^docs/FLOW_STUDIO.*\\.md$"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Explanation of what change is needed and why"
+        },
+        "change_type": {
+          "type": "string",
+          "description": "Nature of the change",
+          "enum": ["modify", "add", "delete"]
+        },
+        "scope": {
+          "type": "string",
+          "description": "Estimated scope of the change",
+          "enum": ["line", "block", "function", "file"]
+        },
+        "governed_surface": {
+          "type": "boolean",
+          "description": "True if this change affects a governed surface (SDK, UIIDs, data-ui-ready)",
+          "default": false
+        },
+        "governance_notes": {
+          "type": "string",
+          "description": "If governed_surface is true, explain why this change is safe or necessary"
+        }
+      }
+    }
+  }
+}

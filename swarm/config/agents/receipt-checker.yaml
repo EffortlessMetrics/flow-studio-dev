@@ -1,0 +1,24 @@
+# swarm/config/agents/receipt-checker.yaml
+# Provider-neutral agent definition (Phase 0.5)
+
+key: receipt-checker
+
+flows:
+  - gate          # Flow 4: Code → Artifact / Gate
+
+category: verification
+color: blue
+source: project/user
+
+short_role: Verify build receipt exists and is complete
+
+model: haiku
+
+primary_artifact: receipt_audit.md
+
+artifacts:
+  - receipt_audit.md
+
+notes: >
+  Gate-stage verification agent. Checks build_receipt.json for completeness,
+  structural integrity, and required fields before downstream gate checks proceed.

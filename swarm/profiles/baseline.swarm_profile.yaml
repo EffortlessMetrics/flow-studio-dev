@@ -1,0 +1,425 @@
+meta:
+  id: baseline
+  label: Baseline 6-Flow SDLC
+  description: Default swarm configuration with 6 flows and 45 agents
+  created_at: '2025-12-08T05:25:38.534622Z'
+  created_by: null
+flows_yaml: "# swarm/config/flows.yaml\n# Canonical definition of SDLC flow ordering\
+  \ and metadata\n# All consumers (Python tools, TypeScript UI) derive from this file\n\
+  \nversion: 1\n\n# Ordered list of flows in SDLC sequence\nflows:\n  - key: signal\n\
+  \    index: 1\n    title: \"Signal -> Spec\"\n    short_title: \"Signal\"\n    description:\
+  \ \"Raw input to problem statement, requirements, BDD scenarios, early risk assessment\"\
+  \n\n  - key: plan\n    index: 2\n    title: \"Spec -> Design\"\n    short_title:\
+  \ \"Plan\"\n    description: \"Requirements to ADR, contracts, observability spec,\
+  \ test/work plans, design validation\"\n\n  - key: build\n    index: 3\n    title:\
+  \ \"Plan -> Code\"\n    short_title: \"Build\"\n    description: \"Implement via\
+  \ adversarial microloops, build code and tests, self-verify, produce receipts\"\n\
+  \n  - key: gate\n    index: 4\n    title: \"Code -> Artifact\"\n    short_title:\
+  \ \"Gate\"\n    description: \"Pre-merge gate, audit receipts, check contracts/security/policy,\
+  \ recommend merge or bounce\"\n\n  - key: deploy\n    index: 5\n    title: \"Artifact\
+  \ -> Prod\"\n    short_title: \"Deploy\"\n    description: \"Move approved artifact\
+  \ to production, execute deployment, verify health, create audit trail\"\n\n  -\
+  \ key: wisdom\n    index: 6\n    title: \"Prod -> Wisdom\"\n    short_title: \"\
+  Wisdom\"\n    description: \"Analyze artifacts, detect regressions, extract learnings,\
+  \ close feedback loops\"\n"
+flow_configs:
+- key: build
+  path: swarm/config/flows/build.yaml
+  yaml: "# Flow 3 - Plan → Code (Build)\n# Source of truth for build flow ordering\
+    \ and agent roles\n\nkey: build\ntitle: \"Flow 3 - Plan → Code (Build)\"\ndescription:\
+    \ \"Implement via adversarial microloops—build code+tests, self-verify, produce\
+    \ receipts that minimize human attention.\"\n\nsteps:\n  - id: branch\n    agents:\n\
+    \      - repo-operator\n    role: \"Ensure clean tree, create feature branch with\
+    \ conventional naming.\"\n\n  - id: load_context\n    agents:\n      - context-loader\n\
+    \    role: \"Load relevant context for subtask → subtask_context_manifest.json.\"\
+    \n\n  - id: clarify\n    agents:\n      - clarifier\n    role: \"Detect ambiguities,\
+    \ draft clarification questions → clarification_questions.md.\"\n\n  - id: author_tests\n\
+    \    agents:\n      - test-author\n    role: \"Write/update tests → tests/*, test_changes_summary.md.\"\
+    \n\n  - id: critique_tests\n    agents:\n      - test-critic\n    role: \"Harsh\
+    \ review of tests vs BDD/spec → test_critique.md. Never fixes.\"\n\n  - id: implement\n\
+    \    agents:\n      - code-implementer\n    role: \"Write code to pass tests,\
+    \ follow ADR → src/*, impl_changes_summary.md.\"\n\n  - id: critique_code\n  \
+    \  agents:\n      - code-critic\n    role: \"Harsh review of code vs ADR/contracts\
+    \ → code_critique.md. Never fixes.\"\n\n  - id: mutate\n    agents:\n      - mutator\n\
+    \    role: \"Run mutation tests to identify weak spots → mutation_report.md.\"\
+    \n\n  - id: fix\n    agents:\n      - fixer\n    role: \"Apply targeted fixes\
+    \ from critics and mutations → fix_summary.md.\"\n\n  - id: docs\n    agents:\n\
+    \      - doc-writer\n    role: \"Update docs, READMEs, API docs → doc_updates.md.\"\
+    \n\n  - id: self_review\n    agents:\n      - self-reviewer\n    role: \"Final\
+    \ review → self_review.md, build_receipt.json with per-dimension verdicts.\"\n\
+    \n  - id: commit\n    agents:\n      - repo-operator\n    role: \"Stage changes,\
+    \ compose commit message, commit to feature branch.\"\n\ncross_cutting:\n  - clarifier\n\
+    \  - repo-operator\n  - gh-reporter\n"
+- key: deploy
+  path: swarm/config/flows/deploy.yaml
+  yaml: "# Flow 5 - Artifact → Prod (Deploy)\n# Source of truth for deployment flow\
+    \ ordering and agent roles\n# This config drives generation of Mermaid diagrams\
+    \ and flow documentation\n\nkey: deploy\ntitle: \"Flow 5 - Artifact → Prod (Deploy)\"\
+    \ndescription: \"Move an approved artifact from 'ready to merge' to 'deployed'—execute\
+    \ deployment, verify health, create audit trail.\"\n\nsteps:\n  - id: decide\n\
+    \    agents:\n      - repo-operator\n    role: \"Merge PR to target branch, create\
+    \ git tag and GitHub release. Record actions in deployment_log.md.\"\n\n  - id:\
+    \ monitor\n    agents:\n      - deploy-monitor\n    role: \"Watch CI/deployment\
+    \ events for the merge commit. Record CI status and deployment events in verification_report.md.\"\
+    \n\n  - id: smoke\n    agents:\n      - smoke-verifier\n    role: \"Run health\
+    \ checks if endpoints available. Verify artifact/release existence. Append results\
+    \ to verification_report.md.\"\n\n  - id: finalize\n    agents:\n      - deploy-decider\n\
+    \    role: \"Synthesize CI + smoke results into deployment_decision.md with status:\
+    \ STABLE/INVESTIGATE/ROLLBACK/NOT_DEPLOYED.\"\n\n  - id: report\n    agents:\n\
+    \      - gh-reporter\n    role: \"Post deployment summary to PR/issue to close\
+    \ the feedback loop.\"\n\ncross_cutting:\n  - repo-operator\n  - gh-reporter\n"
+- key: gate
+  path: swarm/config/flows/gate.yaml
+  yaml: "# Flow 4 - Code → Artifact (Gate)\n# Source of truth for gate flow ordering\
+    \ and agent roles\n\nkey: gate\ntitle: \"Flow 4 - Code → Artifact (Gate)\"\ndescription:\
+    \ \"Pre-merge gate—audit receipts, check contracts/security/policy; recommend\
+    \ merge or bounce.\"\n\nsteps:\n  - id: receipt\n    agents:\n      - receipt-checker\n\
+    \    role: \"Verify build_receipt.json exists and is complete → receipt_audit.md.\"\
+    \n\n  - id: contract\n    agents:\n      - contract-enforcer\n    role: \"Check\
+    \ API changes vs contracts → contract_audit.md.\"\n\n  - id: security\n    agents:\n\
+    \      - security-scanner\n    role: \"Run SAST and secret scans → security_audit.md.\"\
+    \n\n  - id: coverage\n    agents:\n      - coverage-enforcer\n    role: \"Verify\
+    \ test coverage meets thresholds → coverage_audit.md.\"\n\n  - id: gate_fix\n\
+    \    agents:\n      - gate-fixer\n    role: \"Apply mechanical fixes only (lint,\
+    \ format, docstrings, typos, changelogs) → gate_fix_summary.md.\"\n\n  - id: merge_decision\n\
+    \    agents:\n      - merge-decider\n    role: \"Synthesize all checks into merge\
+    \ decision → merge_decision.md with MERGE/BOUNCE/ESCALATE.\"\n\ncross_cutting:\n\
+    \  - policy-analyst\n  - risk-analyst\n  - gh-reporter\n"
+- key: plan
+  path: swarm/config/flows/plan.yaml
+  yaml: "# Flow 2 - Spec → Design (Planning)\n# Source of truth for plan flow ordering\
+    \ and agent roles\n\nkey: plan\ntitle: \"Flow 2 - Spec → Design (Planning)\"\n\
+    description: \"Requirements → ADR, contracts, observability spec, test/work plans,\
+    \ design validation.\"\n\nsteps:\n  - id: impact\n    agents:\n      - impact-analyzer\n\
+    \    role: \"Analyze cross-cutting impact of changes → impact_map.json with file/module\
+    \ focus areas.\"\n\n  - id: options\n    agents:\n      - design-optioneer\n \
+    \   role: \"Propose 2-3 architecture options with trade-offs → design_options.md.\"\
+    \n\n  - id: adr\n    agents:\n      - adr-author\n    role: \"Write Architecture\
+    \ Decision Record for chosen design → adr.md with context, decision, consequences.\"\
+    \n\n  - id: interface\n    agents:\n      - interface-designer\n    role: \"Define\
+    \ API contracts, data models, migrations → api_contracts.yaml, schema.md.\"\n\n\
+    \  - id: observability\n    agents:\n      - observability-designer\n    role:\
+    \ \"Define metrics, logs, traces, SLOs → observability_spec.md.\"\n\n  - id: test_strategy\n\
+    \    agents:\n      - test-strategist\n    role: \"Map BDD scenarios to test types,\
+    \ coverage targets → test_plan.md.\"\n\n  - id: work\n    agents:\n      - work-planner\n\
+    \    role: \"Break design into subtasks, define rollout strategy → work_plan.md.\"\
+    \n\n  - id: design_critique\n    agents:\n      - design-critic\n    role: \"\
+    Validate design vs constraints and requirements → design_critique.md.\"\n\ncross_cutting:\n\
+    \  - clarifier\n  - risk-analyst\n  - policy-analyst\n  - gh-reporter\n"
+- key: signal
+  path: swarm/config/flows/signal.yaml
+  yaml: "key: signal\ntitle: \"Flow 1 - Signal \\u2192 Spec (Shaping)\"\ndescription:\
+    \ \"Raw input \\u2192 problem statement, requirements, BDD scenarios, early\\\n\
+    \  \\ risk assessment.\"\nsteps:\n- id: normalize\n  agents:\n  - signal-normalizer\n\
+    \  role: \"Parse raw input, find related context \\u2192 issue_normalized.md,\
+    \ context_brief.md.\"\n- id: frame\n  agents:\n  - problem-framer\n  role: \"\
+    Synthesize normalized signal \\u2192 problem_statement.md with clear success\\\
+    \n    \\ criteria.\"\n- id: author_reqs\n  agents:\n  - requirements-author\n\
+    \  role: \"Write functional + non-functional requirements \\u2192 requirements.md\
+    \ following\\\n    \\ structured template.\"\n- id: critique_reqs\n  agents:\n\
+    \  - requirements-critic\n  role: \"Harsh review of requirements vs completeness,\
+    \ feasibility, testability \\u2192\\\n    \\ requirements_critique.md.\"\n- id:\
+    \ author_bdd\n  agents:\n  - bdd-author\n  role: \"Turn verified requirements\
+    \ into executable BDD scenarios \\u2192 features/*.feature.\"\n- id: scope\n \
+    \ agents:\n  - scope-assessor\n  role: \"Assess stakeholders, constraints, risks,\
+    \ effort estimate \\u2192 scope_assessment.md.\"\ncross_cutting:\n- clarifier\n\
+    - risk-analyst\n- gh-reporter\n"
+- key: wisdom
+  path: swarm/config/flows/wisdom.yaml
+  yaml: "# Flow 6 - Prod → Wisdom (Analysis)\n# Source of truth for wisdom flow ordering\
+    \ and agent roles\n\nkey: wisdom\ntitle: \"Flow 6 - Prod → Wisdom (Analysis)\"\
+    \ndescription: \"Analyze artifacts, detect regressions, extract learnings, close\
+    \ feedback loops.\"\n\nsteps:\n  - id: audit\n    agents:\n      - artifact-auditor\n\
+    \    role: \"Verify all expected artifacts from Flows 1-5 exist → artifact_audit.md.\"\
+    \n\n  - id: regression\n    agents:\n      - regression-analyst\n    role: \"\
+    Analyze tests, coverage, issues, blame for regressions → regression_report.md.\"\
+    \n\n  - id: history\n    agents:\n      - flow-historian\n    role: \"Compile\
+    \ timeline of all flow activity → flow_history.json with timestamps and decisions.\"\
+    \n\n  - id: learnings\n    agents:\n      - learning-synthesizer\n    role: \"\
+    Extract lessons from receipts and critiques → learnings.md with patterns and recommendations.\"\
+    \n\n  - id: feedback\n    agents:\n      - feedback-applier\n    role: \"Create\
+    \ issues and suggest documentation updates → feedback_actions.md.\"\n\n  - id:\
+    \ wisdom_report\n    agents:\n      - gh-reporter\n    role: \"Post wisdom summary\
+    \ to PR/issue to close the loop.\"\n\ncross_cutting:\n  - risk-analyst\n  - gh-reporter\n"
+agent_configs:
+- key: adr-author
+  path: swarm/config/agents/adr-author.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: adr-author\nflows:\n  - plan\n\
+    category: design\ncolor: purple\nsource: project/user\nshort_role: \"Write ADR\
+    \ for chosen design → adr.md.\"\nmodel: inherit\n"
+- key: artifact-auditor
+  path: swarm/config/agents/artifact-auditor.yaml
+  yaml: "key: artifact-auditor\nflows:\n- wisdom\ncategory: verification\ncolor: blue\n\
+    source: project/user\nshort_role: Verify all expected artifacts from Flows 1-5\
+    \ exist\nmodel: haiku\noutputs:\n- path: RUN_BASE/wisdom/artifact_audit.md\n \
+    \ format: markdown\ntags:\n- flow-6\n- wisdom\n- verification\n"
+- key: bdd-author
+  path: swarm/config/agents/bdd-author.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: bdd-author\nflows:\n  - signal\n\
+    category: spec\ncolor: purple\nsource: project/user\nshort_role: \"Turn requirements\
+    \ into BDD scenarios → features/*.feature.\"\nmodel: inherit\n"
+- key: clarifier
+  path: swarm/config/agents/clarifier.yaml
+  yaml: 'key: clarifier
+
+    flows:
+
+    - 1, 2, 3
+
+    category: shaping
+
+    color: yellow
+
+    source: project/user
+
+    short_role: Detect ambiguities, draft clarification questions.
+
+    model: inherit
+
+    '
+- key: code-critic
+  path: swarm/config/agents/code-critic.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: code-critic\nflows:\n  - build\n\
+    category: critic\ncolor: red\nsource: project/user\nshort_role: \"Harsh review\
+    \ vs ADR/contracts → code_critique.md.\"\nmodel: inherit\n"
+- key: code-implementer
+  path: swarm/config/agents/code-implementer.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: code-implementer\nflows:\n\
+    \  - build\ncategory: implementation\ncolor: green\nsource: project/user\nshort_role:\
+    \ \"Write code to pass tests, following ADR → src/*, impl_changes_summary.md.\"\
+    \nmodel: inherit\nmodel_tier: deep\n\n# Example: per-platform model tier overrides\
+    \ (flattened for simple YAML parser)\n# This agent uses 'deep' tier by default,\
+    \ but overrides to 'balanced' for OpenAI\nplatform_openai_model_tier: balanced\n"
+- key: context-loader
+  path: swarm/config/agents/context-loader.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: context-loader\nflows:\n \
+    \ - build\ncategory: implementation\ncolor: green\nsource: project/user\nshort_role:\
+    \ \"Load relevant code/tests/specs for subtask → subtask_context_manifest.json.\"\
+    \nmodel: inherit\n"
+- key: contract-enforcer
+  path: swarm/config/agents/contract-enforcer.yaml
+  yaml: "# swarm/config/agents/contract-enforcer.yaml\n# Provider-neutral agent definition\
+    \ (Phase 0.5)\n\nkey: contract-enforcer\n\nflows:\n  - gate          # Flow 4:\
+    \ Code → Artifact / Gate\n\ncategory: verification\ncolor: blue\nsource: project/user\n\
+    \nshort_role: Check API changes versus contracts\n\nmodel: inherit\n\nprimary_artifact:\
+    \ contract_compliance.md\n\nartifacts:\n  - contract_compliance.md\n\nnotes: >\n\
+    \  Gate-stage verification agent. Compares proposed API changes against\n  established\
+    \ contracts and schemas to detect breaking changes or\n  incompatibilities.\n"
+- key: coverage-enforcer
+  path: swarm/config/agents/coverage-enforcer.yaml
+  yaml: "# Provider-neutral agent definition (Phase 1-full)\n\nkey: coverage-enforcer\n\
+    \nflows:\n  - gate\n\ncategory: verification\ncolor: blue\nsource: project/user\n\
+    \nshort_role: Verify test coverage meets thresholds\n\nmodel: inherit\n\noutputs:\n\
+    \  - path: RUN_BASE/gate/coverage_audit.md\n    format: markdown\n\ntags:\n  -\
+    \ flow-4\n  - gate\n  - verification\n  - testing\n"
+- key: deploy-decider
+  path: swarm/config/agents/deploy-decider.yaml
+  yaml: "# Provider-neutral agent definition (Phase 0.5)\n\nkey: deploy-decider\n\n\
+    flows:\n  - deploy\n\ncategory: verification\ncolor: blue\nsource: project/user\n\
+    \nshort_role: Verify operationalization FRs (FR-OP-001..005) and issue deployment\
+    \ decision\n\nmodel: inherit\nmodel_tier: balanced\n\noutputs:\n  - path: RUN_BASE/deploy/deployment_decision.md\n\
+    \    format: yaml\n\ntags:\n  - flow-5\n  - deploy\n  - governance\n"
+- key: deploy-monitor
+  path: swarm/config/agents/deploy-monitor.yaml
+  yaml: "# Provider-neutral agent definition (Phase 1-full)\n\nkey: deploy-monitor\n\
+    \nflows:\n  - deploy\n\ncategory: verification\ncolor: blue\nsource: project/user\n\
+    \nshort_role: Watch CI and deployment events\n\nmodel: haiku\n\noutputs:\n  -\
+    \ path: RUN_BASE/deploy/verification_report.md\n    format: markdown\n\ntags:\n\
+    \  - flow-5\n  - deploy\n  - verification\n"
+- key: design-critic
+  path: swarm/config/agents/design-critic.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: design-critic\nflows:\n  -\
+    \ plan\ncategory: critic\ncolor: red\nsource: project/user\nshort_role: \"Validate\
+    \ design vs constraints → design_validation.md. Never fixes.\"\nmodel: inherit\n"
+- key: design-optioneer
+  path: swarm/config/agents/design-optioneer.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: design-optioneer\nflows:\n\
+    \  - plan\ncategory: design\ncolor: purple\nsource: project/user\nshort_role:\
+    \ \"Propose 2-3 architecture options with trade-offs → design_options.md.\"\n\
+    model: inherit\n"
+- key: doc-writer
+  path: swarm/config/agents/doc-writer.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: doc-writer\nflows:\n  - build\n\
+    category: implementation\ncolor: green\nsource: project/user\nshort_role: \"Update\
+    \ inline docs, READMEs, API docs → doc_updates.md.\"\nmodel: inherit\n"
+- key: feedback-applier
+  path: swarm/config/agents/feedback-applier.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: feedback-applier\nflows:\n\
+    \  - wisdom\ncategory: analytics\ncolor: orange\nsource: project/user\nshort_role:\
+    \ \"Create issues, suggest doc updates → feedback_actions.md.\"\nmodel: inherit\n"
+- key: fixer
+  path: swarm/config/agents/fixer.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: fixer\nflows:\n  - build\n\
+    category: implementation\ncolor: green\nsource: project/user\nshort_role: \"Apply\
+    \ targeted fixes from critics/mutation → fix_summary.md.\"\nmodel: inherit\n"
+- key: flow-historian
+  path: swarm/config/agents/flow-historian.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: flow-historian\nflows:\n \
+    \ - wisdom\ncategory: analytics\ncolor: orange\nsource: project/user\nshort_role:\
+    \ \"Compile timeline → flow_history.json.\"\nmodel: inherit\n"
+- key: gate-fixer
+  path: swarm/config/agents/gate-fixer.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: gate-fixer\nflows:\n  - gate\n\
+    category: implementation\ncolor: green\nsource: project/user\nshort_role: \"Mechanical\
+    \ fixes only (lint/format/docs) → gate_fix_summary.md.\"\nmodel: inherit\n"
+- key: gh-reporter
+  path: swarm/config/agents/gh-reporter.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: gh-reporter\nflows:\n  - all\n\
+    category: reporter\ncolor: pink\nsource: project/user\nshort_role: \"Post summaries\
+    \ to GitHub issues/PRs at flow boundaries.\"\nmodel: inherit\n"
+- key: impact-analyzer
+  path: swarm/config/agents/impact-analyzer.yaml
+  yaml: "# swarm/config/agents/impact-analyzer.yaml\n# Provider-neutral agent definition\
+    \ (Phase 0.5)\n\nkey: impact-analyzer\n\nflows:\n  - plan          # Flow 2: Spec\
+    \ → Design / Plan\n\ncategory: analytics\ncolor: orange\nsource: project/user\n\
+    \nshort_role: Analyze cross-cutting impact of changes and produce impact_map.json\n\
+    \nmodel: inherit\n\n# Optional, non-functional but nice to have for later phases:\n\
+    \nprimary_artifact: impact_map.json\n\nartifacts:\n  - impact_map.json\n\nnotes:\
+    \ >\n  Takes Flow 1 requirements and Flow 2 context, identifies affected systems,\n\
+    \  code areas, and risk patterns, and writes a structured impact_map.json that\n\
+    \  downstream agents can consume.\n"
+- key: interface-designer
+  path: swarm/config/agents/interface-designer.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: interface-designer\nflows:\n\
+    \  - plan\ncategory: spec\ncolor: purple\nsource: project/user\nshort_role: \"\
+    API contracts, data models, migrations → api_contracts.yaml, schema.md.\"\nmodel:\
+    \ inherit\n"
+- key: learning-synthesizer
+  path: swarm/config/agents/learning-synthesizer.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: learning-synthesizer\nflows:\n\
+    \  - wisdom\ncategory: analytics\ncolor: orange\nsource: project/user\nshort_role:\
+    \ \"Extract lessons from receipts, critiques → learnings.md.\"\nmodel: inherit\n"
+- key: merge-decider
+  path: swarm/config/agents/merge-decider.yaml
+  yaml: "# Provider-neutral agent definition (Phase 0.5)\n\nkey: merge-decider\n\n\
+    flows:\n  - gate\n\ncategory: verification\ncolor: blue\nsource: project/user\n\
+    \nshort_role: Synthesize all checks into merge decision\n\nmodel: inherit\n\n\
+    outputs:\n  - path: RUN_BASE/gate/merge_decision.md\n    format: markdown\n\n\
+    tags:\n  - flow-4\n  - gate\n  - verification\n"
+- key: mutator
+  path: swarm/config/agents/mutator.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: mutator\nflows:\n  - build\n\
+    category: verification\ncolor: blue\nsource: project/user\nshort_role: \"Run mutation\
+    \ tests → mutation_report.md.\"\nmodel: inherit\n"
+- key: observability-designer
+  path: swarm/config/agents/observability-designer.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: observability-designer\nflows:\n\
+    \  - plan\ncategory: spec\ncolor: purple\nsource: project/user\nshort_role: \"\
+    Metrics, logs, traces, SLOs, alerts → observability_spec.md.\"\nmodel: inherit\n"
+- key: policy-analyst
+  path: swarm/config/agents/policy-analyst.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: policy-analyst\nflows:\n \
+    \ - 2, 4\ncategory: analytics\ncolor: orange\nsource: project/user\nshort_role:\
+    \ \"Interpret policy docs vs change, assess policy implications.\"\nmodel: inherit\n"
+- key: problem-framer
+  path: swarm/config/agents/problem-framer.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: problem-framer\nflows:\n \
+    \ - signal\ncategory: shaping\ncolor: yellow\nsource: project/user\nshort_role:\
+    \ \"Synthesize normalized signal → problem_statement.md.\"\nmodel: inherit\n"
+- key: receipt-checker
+  path: swarm/config/agents/receipt-checker.yaml
+  yaml: "# swarm/config/agents/receipt-checker.yaml\n# Provider-neutral agent definition\
+    \ (Phase 0.5)\n\nkey: receipt-checker\n\nflows:\n  - gate          # Flow 4: Code\
+    \ → Artifact / Gate\n\ncategory: verification\ncolor: blue\nsource: project/user\n\
+    \nshort_role: Verify build receipt exists and is complete\n\nmodel: haiku\n\n\
+    primary_artifact: receipt_audit.md\n\nartifacts:\n  - receipt_audit.md\n\nnotes:\
+    \ >\n  Gate-stage verification agent. Checks build_receipt.json for completeness,\n\
+    \  structural integrity, and required fields before downstream gate checks proceed.\n"
+- key: regression-analyst
+  path: swarm/config/agents/regression-analyst.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: regression-analyst\nflows:\n\
+    \  - wisdom\ncategory: analytics\ncolor: orange\nsource: project/user\nshort_role:\
+    \ \"Tests, coverage, issues, blame → regression_report.md.\"\nmodel: inherit\n"
+- key: repo-operator
+  path: swarm/config/agents/repo-operator.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: repo-operator\nflows:\n  -\
+    \ 3, 5\ncategory: implementation\ncolor: green\nsource: project/user\nshort_role:\
+    \ \"Git workflows: branch, commit, merge, tag. Safe Bash only.\"\nmodel: inherit\n"
+- key: requirements-author
+  path: swarm/config/agents/requirements-author.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: requirements-author\nflows:\n\
+    \  - signal\ncategory: spec\ncolor: purple\nsource: project/user\nshort_role:\
+    \ \"Write functional + non-functional requirements → requirements.md.\"\nmodel:\
+    \ inherit\n"
+- key: requirements-critic
+  path: swarm/config/agents/requirements-critic.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: requirements-critic\nflows:\n\
+    \  - signal\ncategory: critic\ncolor: red\nsource: project/user\nshort_role: \"\
+    Verify requirements are testable, consistent → requirements_critique.md.\"\nmodel:\
+    \ inherit\n"
+- key: risk-analyst
+  path: swarm/config/agents/risk-analyst.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: risk-analyst\nflows:\n  -\
+    \ 1, 2, 4, 6\ncategory: analytics\ncolor: orange\nsource: project/user\nshort_role:\
+    \ \"Identify risk patterns (security, compliance, data, performance).\"\nmodel:\
+    \ inherit\n"
+- key: scope-assessor
+  path: swarm/config/agents/scope-assessor.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: scope-assessor\nflows:\n \
+    \ - signal\ncategory: shaping\ncolor: yellow\nsource: project/user\nshort_role:\
+    \ \"Stakeholders, risks, T-shirt size → stakeholders.md, early_risks.md, scope_estimate.md.\"\
+    \nmodel: inherit\n"
+- key: security-scanner
+  path: swarm/config/agents/security-scanner.yaml
+  yaml: "# Provider-neutral agent definition (Phase 1-full)\n\nkey: security-scanner\n\
+    \nflows:\n  - gate\n\ncategory: verification\ncolor: blue\nsource: project/user\n\
+    \nshort_role: Run SAST and secret scans\n\nmodel: inherit\n\noutputs:\n  - path:\
+    \ RUN_BASE/gate/security_scan.md\n    format: markdown\n\ntags:\n  - flow-4\n\
+    \  - gate\n  - verification\n  - security\n"
+- key: self-reviewer
+  path: swarm/config/agents/self-reviewer.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: self-reviewer\nflows:\n  -\
+    \ build\ncategory: verification\ncolor: blue\nsource: project/user\nshort_role:\
+    \ \"Final review → self_review.md, build_receipt.json.\"\nmodel: inherit\n"
+- key: signal-normalizer
+  path: swarm/config/agents/signal-normalizer.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: signal-normalizer\nflows:\n\
+    \  - signal\ncategory: shaping\ncolor: yellow\nsource: project/user\nshort_role:\
+    \ \"Parse raw input, find related context → issue_normalized.md, context_brief.md.\"\
+    \nmodel: inherit\n"
+- key: smoke-verifier
+  path: swarm/config/agents/smoke-verifier.yaml
+  yaml: "# Provider-neutral agent definition (Phase 1-full)\n\nkey: smoke-verifier\n\
+    \nflows:\n  - deploy\n\ncategory: verification\ncolor: blue\nsource: project/user\n\
+    \nshort_role: Run health checks and verify artifacts\n\nmodel: haiku\n\noutputs:\n\
+    \  - path: RUN_BASE/deploy/verification_report.md\n    format: markdown\n\ntags:\n\
+    \  - flow-5\n  - deploy\n  - verification\n"
+- key: swarm-ops
+  path: swarm/config/agents/swarm-ops.yaml
+  yaml: "# Utility agent for swarm operations and governance\nkey: swarm-ops\n\nflows:\n\
+    \  - utility\n\ncategory: infra\ncolor: cyan\nsource: project/user\n\nshort_role:\
+    \ Guide for agent operations (model changes, adding agents, inspecting flows)\n\
+    \nmodel: inherit\n"
+- key: test-author
+  path: swarm/config/agents/test-author.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: test-author\nflows:\n  - build\n\
+    category: implementation\ncolor: green\nsource: project/user\nshort_role: \"Write/update\
+    \ tests → tests/*, test_changes_summary.md.\"\nmodel: inherit\n"
+- key: test-critic
+  path: swarm/config/agents/test-critic.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: test-critic\nflows:\n  - build\n\
+    category: critic\ncolor: red\nsource: project/user\nshort_role: \"Harsh review\
+    \ vs BDD/spec → test_critique.md.\"\nmodel: inherit\n"
+- key: test-strategist
+  path: swarm/config/agents/test-strategist.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: test-strategist\nflows:\n\
+    \  - plan\ncategory: spec\ncolor: purple\nsource: project/user\nshort_role: \"\
+    Map BDD scenarios to test types → test_plan.md.\"\nmodel: inherit\n"
+- key: ux-critic
+  path: swarm/config/agents/ux-critic.yaml
+  yaml: "# Utility agent for Flow Studio UX review\nkey: ux-critic\n\nflows:\n  -\
+    \ utility\n\ncategory: critic\ncolor: red\nsource: project/user\n\nshort_role:\
+    \ Inspect Flow Studio screens and produce structured JSON critiques.\n\nmodel:\
+    \ inherit\n"
+- key: ux-implementer
+  path: swarm/config/agents/ux-implementer.yaml
+  yaml: "# Utility agent for Flow Studio UX implementation\nkey: ux-implementer\n\n\
+    flows:\n  - utility\n\ncategory: implementation\ncolor: green\nsource: project/user\n\
+    \nshort_role: Apply UX critique fixes to Flow Studio code and run tests.\n\nmodel:\
+    \ inherit\n"
+- key: work-planner
+  path: swarm/config/agents/work-planner.yaml
+  yaml: "# Auto-bootstrapped from swarm/AGENTS.md\nkey: work-planner\nflows:\n  -\
+    \ plan\ncategory: design\ncolor: purple\nsource: project/user\nshort_role: \"\
+    Break design into subtasks, define rollout strategy → work_plan.md.\"\nmodel:\
+    \ inherit\n"

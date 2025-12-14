@@ -1,0 +1,20 @@
+{
+  "engine": "claude-step",
+  "mode": "stub",
+  "provider": "anthropic",
+  "model": "claude-stub",
+  "step_id": "mutate",
+  "flow_key": "build",
+  "run_id": "run-20251209-100044-rdkk8z",
+  "agent_key": "mutator",
+  "started_at": "2025-12-09T10:00:44.682414+00:00Z",
+  "completed_at": "2025-12-09T10:00:44.682491+00:00Z",
+  "duration_ms": 0,
+  "status": "succeeded",
+  "tokens": {
+    "prompt": 0,
+    "completion": 0,
+    "total": 0
+  },
+  "transcript_path": "llm/mutate-mutator-claude.jsonl"
+}

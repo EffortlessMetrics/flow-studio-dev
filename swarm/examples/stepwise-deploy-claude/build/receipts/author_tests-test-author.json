@@ -1,0 +1,20 @@
+{
+  "engine": "claude-step",
+  "mode": "stub",
+  "provider": "anthropic",
+  "model": "claude-stub",
+  "step_id": "author_tests",
+  "flow_key": "build",
+  "run_id": "run-20251209-102036-zjl1mf",
+  "agent_key": "test-author",
+  "started_at": "2025-12-09T10:20:36.143543+00:00Z",
+  "completed_at": "2025-12-09T10:20:36.143627+00:00Z",
+  "duration_ms": 0,
+  "status": "succeeded",
+  "tokens": {
+    "prompt": 0,
+    "completion": 0,
+    "total": 0
+  },
+  "transcript_path": "llm/author_tests-test-author-claude.jsonl"
+}

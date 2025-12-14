@@ -1,0 +1,38 @@
+{
+  "run_id": "health-check-missing-tests",
+  "subtask_id": "subtask-1",
+  "timestamp": "2025-01-15T11:00:00Z",
+  "steps_completed": {
+    "context_load": "COMPLETE",
+    "test_author": "INCOMPLETE",
+    "test_critic": "SKIPPED",
+    "code_implementer": "COMPLETE",
+    "code_critic": "COMPLETE",
+    "mutation_testing": "SKIPPED",
+    "self_review": "COMPLETE"
+  },
+  "artifacts_produced": {
+    "subtask_context_manifest.json": true,
+    "test_changes_summary.md": false,
+    "test_critique.md": false,
+    "impl_changes_summary.md": true,
+    "code_critique.md": true,
+    "mutation_report.md": false,
+    "build_receipt.json": true
+  },
+  "test_results": {
+    "status": "NOT_RUN",
+    "reason": "No tests authored"
+  },
+  "git_status": {
+    "branch": "feature/health-check-missing-tests",
+    "files_changed": 2,
+    "commit_status": "NOT_COMMITTED"
+  },
+  "completion_state": "DEGRADED",
+  "blockers": [
+    "Test artifacts missing - test_changes_summary.md not produced",
+    "No test verification performed"
+  ],
+  "recommended_next": "Return to test-author step to create required test coverage"
+}

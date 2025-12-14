@@ -1,0 +1,24 @@
+# Provider-neutral agent definition (Phase 0.5)
+
+key: deploy-decider
+
+flows:
+  - deploy
+
+category: verification
+color: blue
+source: project/user
+
+short_role: Verify operationalization FRs (FR-OP-001..005) and issue deployment decision
+
+model: inherit
+model_tier: balanced
+
+outputs:
+  - path: RUN_BASE/deploy/deployment_decision.md
+    format: yaml
+
+tags:
+  - flow-5
+  - deploy
+  - governance

@@ -1,0 +1,8 @@
+key: clarifier
+flows:
+- 1, 2, 3
+category: shaping
+color: yellow
+source: project/user
+short_role: Detect ambiguities, draft clarification questions.
+model: inherit

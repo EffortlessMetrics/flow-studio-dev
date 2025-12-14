@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: flow-historian
+flows:
+  - wisdom
+category: analytics
+color: orange
+source: project/user
+short_role: "Compile timeline → flow_history.json."
+model: inherit

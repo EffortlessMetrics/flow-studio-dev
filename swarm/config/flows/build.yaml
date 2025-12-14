@@ -1,0 +1,317 @@
+# Flow 3 - Plan → Code (Build)
+# Source of truth for build flow ordering and agent roles
+
+key: build
+title: "Flow 3 - Plan → Code (Build)"
+description: "Implement via adversarial microloops—build code+tests, self-verify, produce receipts that minimize human attention."
+
+teaching:
+  title: "Plan to Code: Adversarial Microloops in Action"
+  summary: "This is where the core 'spend compute to save attention' pattern shines. Two adversarial microloops (test author/critic and code implementer/critic) iterate until verified. Critics never fix - they write harsh feedback that drives improvement."
+
+steps:
+  - id: branch
+    agents:
+      - repo-operator
+    role: "Ensure clean tree, create feature branch with conventional naming."
+    routing:
+      kind: linear
+      next: load_context
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/plan/work_plan.md"
+      outputs:
+        - "RUN_BASE/build/git_status.md"
+      emphasizes:
+        - "clean git state before work"
+        - "conventional branch naming"
+      constraints:
+        - "no force operations"
+        - "no destructive git commands"
+
+  - id: load_context
+    agents:
+      - context-loader
+    role: "Load relevant context for subtask → subtask_context_manifest.json."
+    routing:
+      kind: linear
+      next: clarify
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/plan/work_plan.md"
+        - "RUN_BASE/plan/test_plan.md"
+        - "RUN_BASE/plan/adr.md"
+        - "RUN_BASE/signal/requirements.md"
+        - "RUN_BASE/signal/bdd_scenarios.md"
+      outputs:
+        - "RUN_BASE/build/subtask_context_manifest.json"
+      emphasizes:
+        - "heavy context loading (20-50k tokens)"
+        - "identify all relevant files"
+        - "map dependencies and relationships"
+      constraints: []
+
+  - id: clarify
+    agents:
+      - clarifier
+    role: "Detect ambiguities, draft clarification questions → clarification_questions.md."
+    routing:
+      kind: linear
+      next: author_tests
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/build/subtask_context_manifest.json"
+        - "RUN_BASE/plan/work_plan.md"
+        - "RUN_BASE/signal/requirements.md"
+      outputs:
+        - "RUN_BASE/build/clarification_questions.md"
+      emphasizes:
+        - "identify ambiguous requirements"
+        - "surface implicit assumptions"
+      constraints:
+        - "document concerns but never block"
+        - "state assumptions and continue"
+
+  - id: author_tests
+    agents:
+      - test-author
+    role: "Write/update tests → tests/*, test_changes_summary.md."
+    teaching_note: "Tests are written FIRST, before implementation. The test author uses BDD scenarios from Flow 1 as the specification."
+    teaching_highlight: true
+    routing:
+      kind: linear
+      next: critique_tests
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/plan/test_plan.md"
+        - "RUN_BASE/build/subtask_context_manifest.json"
+        - "RUN_BASE/signal/bdd_scenarios.md"
+        - "RUN_BASE/build/test_critique.md"
+      outputs:
+        - "RUN_BASE/build/test_changes_summary.md"
+        - "tests/**"
+      emphasizes:
+        - "test-first development"
+        - "BDD scenarios from signal flow"
+        - "cover edge cases and error paths"
+      constraints:
+        - "no production code changes"
+        - "tests only"
+
+  - id: critique_tests
+    agents:
+      - test-critic
+    role: "Harsh review of tests vs BDD/spec → test_critique.md. Never fixes."
+    teaching_note: "MICROLOOP: Test critic provides harsh feedback but NEVER fixes code. Loop continues with test-author until Status=VERIFIED. This separation of concerns ensures objectivity."
+    teaching_highlight: true
+    routing:
+      kind: microloop
+      loop_target: author_tests
+      loop_condition_field: status
+      loop_success_values:
+        - "VERIFIED"
+        - "verified"
+      next: implement
+      max_iterations: 3
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/build/test_changes_summary.md"
+        - "RUN_BASE/signal/bdd_scenarios.md"
+        - "RUN_BASE/signal/requirements.md"
+        - "tests/**"
+      outputs:
+        - "RUN_BASE/build/test_critique.md"
+      emphasizes:
+        - "harsh review"
+        - "check coverage of requirements"
+        - "verify BDD scenario mapping"
+        - "identify missing edge cases"
+      constraints:
+        - "never fix, only critique"
+        - "provide clear Status and can_further_iteration_help"
+
+  - id: implement
+    agents:
+      - code-implementer
+    role: "Write code to pass tests, follow ADR → src/*, impl_changes_summary.md."
+    teaching_note: "Implementation MUST follow the ADR from Flow 2. The implementer makes tests pass while respecting design constraints. If ADR conflicts arise, they are documented, not silently changed."
+    teaching_highlight: true
+    routing:
+      kind: linear
+      next: critique_code
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/build/subtask_context_manifest.json"
+        - "RUN_BASE/plan/adr.md"
+        - "RUN_BASE/plan/api_contracts.yaml"
+        - "RUN_BASE/plan/interface_spec.md"
+        - "RUN_BASE/plan/observability_spec.md"
+        - "RUN_BASE/build/code_critique.md"
+        - "tests/**"
+      outputs:
+        - "RUN_BASE/build/impl_changes_summary.md"
+        - "src/**"
+      emphasizes:
+        - "make tests pass"
+        - "follow ADR patterns strictly"
+        - "observability hooks per spec"
+        - "idiomatic and consistent code"
+      constraints:
+        - "do not change test logic or assertions"
+        - "document ADR conflicts, do not silently deviate"
+
+  - id: critique_code
+    agents:
+      - code-critic
+    role: "Harsh review of code vs ADR/contracts → code_critique.md. Never fixes."
+    teaching_note: "MICROLOOP: Code critic verifies ADR compliance and contract adherence. If code_critique.md exists from a previous iteration, the implementer must address cited violations."
+    teaching_highlight: true
+    routing:
+      kind: microloop
+      loop_target: implement
+      loop_condition_field: status
+      loop_success_values:
+        - "VERIFIED"
+        - "verified"
+      next: mutate
+      max_iterations: 3
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/build/impl_changes_summary.md"
+        - "RUN_BASE/plan/adr.md"
+        - "RUN_BASE/plan/api_contracts.yaml"
+        - "RUN_BASE/plan/interface_spec.md"
+        - "src/**"
+      outputs:
+        - "RUN_BASE/build/code_critique.md"
+      emphasizes:
+        - "verify ADR compliance"
+        - "check contract adherence"
+        - "identify pattern violations"
+        - "flag observability gaps"
+      constraints:
+        - "never fix, only critique"
+        - "provide clear Status and can_further_iteration_help"
+
+  - id: mutate
+    agents:
+      - mutator
+    role: "Run mutation tests to identify weak spots → mutation_report.md."
+    routing:
+      kind: linear
+      next: fix
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/build/impl_changes_summary.md"
+        - "src/**"
+        - "tests/**"
+      outputs:
+        - "RUN_BASE/build/mutation_report.md"
+      emphasizes:
+        - "identify weak test coverage"
+        - "find code paths not exercised"
+        - "surface equivalent mutants"
+      constraints: []
+
+  - id: fix
+    agents:
+      - fixer
+    role: "Apply targeted fixes from critics and mutations → fix_summary.md."
+    routing:
+      kind: linear
+      next: docs
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/build/code_critique.md"
+        - "RUN_BASE/build/test_critique.md"
+        - "RUN_BASE/build/mutation_report.md"
+        - "src/**"
+        - "tests/**"
+      outputs:
+        - "RUN_BASE/build/fix_summary.md"
+        - "src/**"
+        - "tests/**"
+      emphasizes:
+        - "address critique violations"
+        - "strengthen test coverage"
+        - "targeted fixes only"
+      constraints:
+        - "do not make unrelated changes"
+        - "preserve ADR compliance"
+
+  - id: docs
+    agents:
+      - doc-writer
+    role: "Update docs, READMEs, API docs → doc_updates.md."
+    routing:
+      kind: linear
+      next: self_review
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/build/impl_changes_summary.md"
+        - "RUN_BASE/plan/adr.md"
+        - "src/**"
+      outputs:
+        - "RUN_BASE/build/doc_updates.md"
+      emphasizes:
+        - "document public API changes"
+        - "update README if needed"
+        - "keep docs in sync with code"
+      constraints:
+        - "only create docs if explicitly requested"
+
+  - id: self_review
+    agents:
+      - self-reviewer
+    role: "Final review → self_review.md, build_receipt.json with per-dimension verdicts."
+    routing:
+      kind: linear
+      next: commit
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/build/impl_changes_summary.md"
+        - "RUN_BASE/build/test_changes_summary.md"
+        - "RUN_BASE/build/code_critique.md"
+        - "RUN_BASE/build/test_critique.md"
+        - "RUN_BASE/build/fix_summary.md"
+        - "RUN_BASE/plan/adr.md"
+        - "src/**"
+        - "tests/**"
+      outputs:
+        - "RUN_BASE/build/self_review.md"
+        - "RUN_BASE/build/build_receipt.json"
+      emphasizes:
+        - "holistic quality assessment"
+        - "per-dimension verdicts"
+        - "identify remaining risks"
+      constraints:
+        - "be honest about unresolved issues"
+        - "document concerns for gate review"
+
+  - id: commit
+    agents:
+      - repo-operator
+    role: "Stage changes, compose commit message, commit to feature branch."
+    routing:
+      kind: linear
+      # Final step - no next, flow is complete
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/build/impl_changes_summary.md"
+        - "RUN_BASE/build/self_review.md"
+        - "src/**"
+        - "tests/**"
+      outputs:
+        - "RUN_BASE/build/commit_info.md"
+      emphasizes:
+        - "conventional commit message"
+        - "stage only relevant files"
+        - "no secrets or credentials"
+      constraints:
+        - "no force push"
+        - "no amend unless explicitly requested"
+
+cross_cutting:
+  - clarifier
+  - repo-operator
+  - gh-reporter

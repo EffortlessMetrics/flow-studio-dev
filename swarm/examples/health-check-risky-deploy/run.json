@@ -1,0 +1,5 @@
+{
+  "title": "Health Check - Risky Deploy",
+  "description": "All flows complete with risk warnings. Gate approved with conditions, deploy proceeds with monitoring.",
+  "tags": ["scenario", "risk-accepted", "conditional-approval"]
+}

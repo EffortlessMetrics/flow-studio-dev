@@ -1,0 +1,82 @@
+id: walk-build
+title: "Walk Build Flow"
+description: "See how tests and code are written through critic loops"
+steps:
+  - target:
+      type: flow
+      flow: build
+    title: "Build Flow Overview"
+    text: "Build implements code via adversarial microloops: author creates, critic reviews. The loop continues until VERIFIED or no further iteration helps."
+    action: select_flow
+
+  - target:
+      type: step
+      flow: build
+      step: branch
+    title: "Create Feature Branch"
+    text: "Repo-operator ensures a clean tree and creates a feature branch with conventional naming. Git state is managed safely."
+    action: select_step
+
+  - target:
+      type: step
+      flow: build
+      step: load_context
+    title: "Load Context"
+    text: "Context-loader gathers relevant files, specs, and history into subtask_context_manifest.json. Heavy context loading (20-50k tokens) saves downstream work."
+    action: select_step
+
+  - target:
+      type: step
+      flow: build
+      step: author_tests
+    title: "Write Tests First"
+    text: "Test-author writes tests BEFORE implementation, into tests/* and features/*. Tests are authored against the BDD scenarios and requirements."
+    action: select_step
+
+  - target:
+      type: step
+      flow: build
+      step: critique_tests
+    title: "Test Critique"
+    text: "Test-critic reviews tests harshly against BDD/spec. Status: VERIFIED or UNVERIFIED. The loop repeats while can_further_iteration_help=yes."
+    action: select_step
+
+  - target:
+      type: step
+      flow: build
+      step: implement
+    title: "Implement Code"
+    text: "Code-implementer writes code to pass the verified tests, following the ADR and contracts. Output: src/* changes and impl_changes_summary.md."
+    action: select_step
+
+  - target:
+      type: step
+      flow: build
+      step: critique_code
+    title: "Code Critique"
+    text: "Code-critic reviews code against ADR and contracts. Another microloop - critics never fix, only identify issues."
+    action: select_step
+
+  - target:
+      type: step
+      flow: build
+      step: mutate
+    title: "Mutation Testing"
+    text: "Mutator runs mutation tests to identify weak spots in test coverage. Output: mutation_report.md with surviving mutants."
+    action: select_step
+
+  - target:
+      type: step
+      flow: build
+      step: self_review
+    title: "Self Review"
+    text: "Self-reviewer produces build_receipt.json with per-dimension verdicts. This receipt is the decision artifact for Gate flow."
+    action: select_step
+
+  - target:
+      type: step
+      flow: build
+      step: commit
+    title: "Commit Changes"
+    text: "Repo-operator stages changes, composes a commit message, and commits to the feature branch. Build flow complete!"
+    action: select_step

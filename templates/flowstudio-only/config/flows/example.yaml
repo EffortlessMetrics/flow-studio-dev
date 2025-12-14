@@ -1,0 +1,25 @@
+# Example flow definition
+# Copy this file and modify for your own flows
+
+key: example
+title: "Example Flow - Data Pipeline"
+description: "A sample 3-step data processing pipeline demonstrating flow structure."
+steps:
+  - id: ingest
+    title: "Ingest Data"
+    agents:
+      - data-fetcher
+    role: "Fetch raw data from external sources and validate format."
+
+  - id: transform
+    title: "Transform Data"
+    agents:
+      - data-transformer
+      - data-validator
+    role: "Clean, normalize, and enrich the ingested data."
+
+  - id: publish
+    title: "Publish Results"
+    agents:
+      - data-publisher
+    role: "Write processed data to output destinations and notify downstream consumers."

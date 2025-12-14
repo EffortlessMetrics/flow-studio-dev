@@ -1,0 +1,3 @@
+{"timestamp": "2025-12-09T10:20:36.132131+00:00Z", "role": "system", "content": "Executing step normalize with agent signal-normalizer"}
+{"timestamp": "2025-12-09T10:20:36.132131+00:00Z", "role": "user", "content": "Step role: Parse raw input, find related context \u2192 issue_normalized.md, context_brief.md."}
+{"timestamp": "2025-12-09T10:20:36.132661+00:00Z", "role": "assistant", "content": "[STUB] Completed step normalize. In production, this would contain the actual Claude response."}

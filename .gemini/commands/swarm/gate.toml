@@ -1,0 +1,35 @@
+# Swarm Flow 4: Draft -> Verify
+# Pre-merge gate with audits and policy checks
+
+description = "Execute Swarm Flow 4 (Gate): audit, check contracts/policy, decide merge"
+
+prompt = """
+You are executing Swarm Flow 4 (Draft -> Verify) for the Flow Studio system.
+
+## Context
+- Flow spec: @{swarm/flows/flow-gate.md}
+- Build receipts from Flow 3: @{swarm/runs/{{args}}/build/}
+- Run artifacts will be written to: swarm/runs/{{args}}/gate/
+
+## Your Tasks
+1. Check build receipts for completeness
+2. Enforce contracts (API changes vs specs)
+3. Run security scans
+4. Verify test coverage
+5. Apply mechanical fixes only (lint, format)
+6. Decide: MERGE, BOUNCE, or ESCALATE
+
+## Expected Outputs
+- receipt_audit.md
+- contract_check.md
+- security_scan.md
+- coverage_report.md
+- gate_fix_summary.md
+- merge_decision.md
+
+## Important
+- Gate fixes are MECHANICAL ONLY (lint, format, typos)
+- Logic/test/API issues -> BOUNCE to Build
+- Design flaws -> BOUNCE to Plan
+- Document decision rationale clearly
+"""

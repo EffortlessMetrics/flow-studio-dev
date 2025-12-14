@@ -1,0 +1,8 @@
+# Example agent definition
+# Copy this file and modify for your own agents
+
+key: data-fetcher
+category: implementation
+color: green
+short_role: "Fetch data from external APIs and file sources."
+model: inherit

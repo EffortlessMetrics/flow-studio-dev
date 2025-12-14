@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: test-critic
+flows:
+  - build
+category: critic
+color: red
+source: project/user
+short_role: "Harsh review vs BDD/spec → test_critique.md."
+model: inherit

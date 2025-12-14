@@ -1,0 +1,211 @@
+# Flow 2 - Spec → Design (Planning)
+# Source of truth for plan flow ordering and agent roles
+
+key: plan
+title: "Flow 2 - Spec → Design (Planning)"
+description: "Requirements → ADR, contracts, observability spec, test/work plans, design validation."
+
+teaching:
+  title: "Spec to Design: Architecture Decisions and Contracts"
+  summary: "This flow transforms requirements into concrete design decisions documented in an ADR (Architecture Decision Record). The ADR becomes the authoritative guide for Flow 3 implementation, and contracts define the boundaries that the Gate flow will enforce."
+
+steps:
+  - id: impact
+    agents:
+      - impact-analyzer
+    role: "Analyze cross-cutting impact of changes → impact_map.json with file/module focus areas."
+    routing:
+      kind: linear
+      next: options
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/signal/requirements.md"
+        - "RUN_BASE/signal/bdd_scenarios.md"
+        - "RUN_BASE/signal/scope_assessment.md"
+        - "existing codebase"
+      outputs:
+        - "RUN_BASE/plan/impact_map.json"
+      emphasizes:
+        - "heavy context loading (20-50k tokens)"
+        - "identify all affected modules"
+        - "map dependencies and ripple effects"
+        - "surface hidden coupling"
+      constraints: []
+
+  - id: options
+    agents:
+      - design-optioneer
+    role: "Propose 2-3 architecture options with trade-offs → design_options.md."
+    routing:
+      kind: linear
+      next: adr
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/plan/impact_map.json"
+        - "RUN_BASE/signal/requirements.md"
+        - "RUN_BASE/signal/problem_statement.md"
+      outputs:
+        - "RUN_BASE/plan/design_options.md"
+      emphasizes:
+        - "present multiple viable options"
+        - "explicit trade-off analysis"
+        - "consider long-term maintainability"
+        - "assess technical debt implications"
+      constraints:
+        - "minimum 2 options required"
+        - "no recommendation, just options"
+
+  - id: adr
+    agents:
+      - adr-author
+    role: "Write Architecture Decision Record for chosen design → adr.md with context, decision, consequences."
+    teaching_note: "The ADR is the single source of truth for design decisions. It captures WHY a design was chosen, not just WHAT. Flow 3 agents must follow the ADR strictly."
+    teaching_highlight: true
+    routing:
+      kind: linear
+      next: interface
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/plan/design_options.md"
+        - "RUN_BASE/plan/impact_map.json"
+        - "RUN_BASE/signal/requirements.md"
+      outputs:
+        - "RUN_BASE/plan/adr.md"
+      emphasizes:
+        - "document the WHY, not just WHAT"
+        - "capture context and constraints"
+        - "state consequences explicitly"
+        - "reference rejected alternatives"
+      constraints:
+        - "must select from design_options.md"
+        - "must justify selection"
+
+  - id: interface
+    agents:
+      - interface-designer
+    role: "Define API contracts, data models, migrations → api_contracts.yaml, schema.md."
+    teaching_note: "Contracts define the boundaries between components. The Gate flow (Flow 4) will verify implementation matches these contracts exactly."
+    teaching_highlight: true
+    routing:
+      kind: linear
+      next: observability
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/plan/adr.md"
+        - "RUN_BASE/signal/requirements.md"
+        - "existing API contracts"
+      outputs:
+        - "RUN_BASE/plan/api_contracts.yaml"
+        - "RUN_BASE/plan/interface_spec.md"
+        - "RUN_BASE/plan/schema.md"
+      emphasizes:
+        - "define clear API boundaries"
+        - "specify data models precisely"
+        - "plan migration strategy"
+        - "ensure backward compatibility"
+      constraints:
+        - "contracts must be verifiable"
+        - "follow existing API conventions"
+
+  - id: observability
+    agents:
+      - observability-designer
+    role: "Define metrics, logs, traces, SLOs → observability_spec.md."
+    routing:
+      kind: linear
+      next: test_strategy
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/plan/adr.md"
+        - "RUN_BASE/plan/api_contracts.yaml"
+        - "RUN_BASE/signal/requirements.md"
+      outputs:
+        - "RUN_BASE/plan/observability_spec.md"
+      emphasizes:
+        - "define key metrics"
+        - "specify logging requirements"
+        - "plan distributed tracing"
+        - "set SLOs and alerting thresholds"
+      constraints:
+        - "must cover error paths"
+        - "respect privacy requirements"
+
+  - id: test_strategy
+    agents:
+      - test-strategist
+    role: "Map BDD scenarios to test types, coverage targets → test_plan.md."
+    routing:
+      kind: linear
+      next: work
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/signal/bdd_scenarios.md"
+        - "RUN_BASE/plan/adr.md"
+        - "RUN_BASE/plan/api_contracts.yaml"
+      outputs:
+        - "RUN_BASE/plan/test_plan.md"
+      emphasizes:
+        - "map scenarios to test types"
+        - "define coverage targets"
+        - "plan integration test strategy"
+        - "identify property-based test opportunities"
+      constraints:
+        - "all BDD scenarios must be covered"
+        - "coverage targets must be realistic"
+
+  - id: work
+    agents:
+      - work-planner
+    role: "Break design into subtasks, define rollout strategy → work_plan.md."
+    routing:
+      kind: linear
+      next: design_critique
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/plan/adr.md"
+        - "RUN_BASE/plan/test_plan.md"
+        - "RUN_BASE/plan/api_contracts.yaml"
+        - "RUN_BASE/signal/scope_assessment.md"
+      outputs:
+        - "RUN_BASE/plan/work_plan.md"
+      emphasizes:
+        - "break into atomic subtasks"
+        - "define clear dependencies"
+        - "plan rollout sequence"
+        - "identify parallelization opportunities"
+      constraints:
+        - "subtasks must be independently testable"
+        - "respect dependency order"
+
+  - id: design_critique
+    agents:
+      - design-critic
+    role: "Validate design vs constraints and requirements → design_critique.md."
+    teaching_note: "The design critic ensures the plan is sound before implementation begins. Catching design flaws here is far cheaper than fixing them in code."
+    teaching_highlight: true
+    routing:
+      kind: linear
+      # Final step - no next, flow is complete
+    teaching_notes:
+      inputs:
+        - "RUN_BASE/plan/adr.md"
+        - "RUN_BASE/plan/api_contracts.yaml"
+        - "RUN_BASE/plan/test_plan.md"
+        - "RUN_BASE/plan/work_plan.md"
+        - "RUN_BASE/signal/requirements.md"
+      outputs:
+        - "RUN_BASE/plan/design_critique.md"
+      emphasizes:
+        - "verify ADR addresses requirements"
+        - "check contracts for completeness"
+        - "identify design risks"
+        - "assess implementation feasibility"
+      constraints:
+        - "never fix, only critique"
+        - "document concerns for human review"
+
+cross_cutting:
+  - clarifier
+  - risk-analyst
+  - policy-analyst
+  - gh-reporter

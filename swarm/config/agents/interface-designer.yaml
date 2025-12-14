@@ -1,0 +1,9 @@
+# Auto-bootstrapped from swarm/AGENTS.md
+key: interface-designer
+flows:
+  - plan
+category: spec
+color: purple
+source: project/user
+short_role: "API contracts, data models, migrations → api_contracts.yaml, schema.md."
+model: inherit

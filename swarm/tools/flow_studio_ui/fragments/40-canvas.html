@@ -1,0 +1,36 @@
+  <main id="graph" role="main" aria-label="Flow graph visualization" data-uiid="flow_studio.canvas">
+    <!-- Empty state shown when no run is loaded -->
+    <div id="canvas-empty-state" class="fs-empty" style="display: none; position: absolute; inset: 0; z-index: 5;" data-uiid="flow_studio.canvas.empty">
+      <div class="fs-empty-icon">📊</div>
+      <p class="fs-empty-title">Welcome to Flow Studio</p>
+      <p class="fs-empty-description">Select a run from the sidebar to visualize flows.</p>
+      <div style="margin-top: 16px; text-align: center;">
+        <p class="fs-text-sm fs-text-muted">Generate a demo run with:</p>
+        <code class="mono" style="display: block; margin-top: 8px; padding: 8px 12px; background: #f3f4f6; border-radius: 4px; font-size: 12px;">make stepwise-sdlc-stub</code>
+      </div>
+    </div>
+    <div id="legend" class="collapsed" data-uiid="flow_studio.canvas.legend">
+      <div class="legend-header" id="legend-toggle" role="button" aria-expanded="false" aria-controls="legend-content" data-uiid="flow_studio.canvas.legend.toggle">
+        <span>Legend</span>
+        <span class="legend-arrow">▼</span>
+      </div>
+      <div class="legend-content" id="legend-content" data-uiid="flow_studio.canvas.legend.content">
+        <div class="legend-item"><span class="legend-color" style="background: #0f766e;"></span><span>Step (teal)</span></div>
+        <div class="legend-item"><span class="legend-color" style="background: #9ca3af;"></span><span>Agent (colored by role)</span></div>
+        <div class="legend-separator"></div>
+        <div class="legend-item"><span class="legend-line solid"></span><span>Step sequence</span></div>
+        <div class="legend-item"><span class="legend-line dotted"></span><span>Step -&gt; Agent</span></div>
+        <div class="legend-separator"></div>
+        <div class="legend-section-title">Role colors</div>
+        <div class="legend-item"><span class="legend-color" style="background: #facc15;"></span><span>Yellow: shaping</span></div>
+        <div class="legend-item"><span class="legend-color" style="background: #a855f7;"></span><span>Purple: spec/design</span></div>
+        <div class="legend-item"><span class="legend-color" style="background: #22c55e;"></span><span>Green: implementation</span></div>
+        <div class="legend-item"><span class="legend-color" style="background: #ef4444;"></span><span>Red: critic</span></div>
+        <div class="legend-item"><span class="legend-color" style="background: #3b82f6;"></span><span>Blue: verification</span></div>
+        <div class="legend-item"><span class="legend-color" style="background: #f97316;"></span><span>Orange: analytics</span></div>
+        <div class="legend-item"><span class="legend-color" style="background: #ec4899;"></span><span>Pink: reporter</span></div>
+      </div>
+    </div>
+    <!-- Semantic graph outline for accessibility and LLM agents -->
+    <section id="flow-outline" class="visually-hidden" role="tree" aria-label="Flow outline" data-uiid="flow_studio.canvas.outline"></section>
+  </main>

@@ -1,0 +1,23 @@
+# Provider-neutral agent definition (Phase 0.5)
+
+key: merge-decider
+
+flows:
+  - gate
+
+category: verification
+color: blue
+source: project/user
+
+short_role: Synthesize all checks into merge decision
+
+model: inherit
+
+outputs:
+  - path: RUN_BASE/gate/merge_decision.md
+    format: markdown
+
+tags:
+  - flow-4
+  - gate
+  - verification

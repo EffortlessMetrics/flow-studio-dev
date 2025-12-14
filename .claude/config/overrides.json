@@ -1,0 +1,28 @@
+{
+  "overrides": [
+    {
+      "step_id": "bdd",
+      "reason": "BDD under construction",
+      "approver": "alice",
+      "created_at": "2025-11-30T07:27:41.753083+00:00",
+      "expires_at": "2025-12-01T07:27:41.753083+00:00",
+      "status": "REVOKED"
+    },
+    {
+      "step_id": "step1",
+      "reason": "Test reason",
+      "approver": "approver1",
+      "created_at": "2025-11-30T07:28:00.162138+00:00",
+      "expires_at": "2025-12-01T07:28:00.162138+00:00",
+      "status": "REVOKED"
+    },
+    {
+      "step_id": "test-step",
+      "reason": "Testing",
+      "approver": "tester",
+      "created_at": "2025-11-30T07:28:05.228366+00:00",
+      "expires_at": "2025-12-01T07:28:05.228366+00:00",
+      "status": "REVOKED"
+    }
+  ]
+}

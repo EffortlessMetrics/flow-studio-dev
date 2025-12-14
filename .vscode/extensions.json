@@ -1,0 +1,30 @@
+{
+  "recommendations": [
+    "anthropic.claude-dev",
+
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "rust-lang.rust-analyzer",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "redhat.vscode-yaml",
+
+    "hbenl.vscode-test-explorer",
+    "cucumberopen.cucumber-official",
+    "alexkrechik.cucumberautocomplete",
+    "usernamehw.errorlens",
+
+    "yzhang.markdown-all-in-one",
+    "bierner.markdown-mermaid",
+    "streetsidesoftware.code-spell-checker",
+    "davidanson.vscode-markdownlint",
+
+    "hashicorp.terraform",
+    "timonwong.shellcheck",
+    "ms-azuretools.vscode-docker",
+    "ms-kubernetes-tools.vscode-kubernetes-tools",
+
+    "eamodio.gitlens",
+    "github.vscode-pull-request-github"
+  ]
+}

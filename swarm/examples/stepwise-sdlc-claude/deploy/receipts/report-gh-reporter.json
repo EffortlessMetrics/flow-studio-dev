@@ -1,0 +1,20 @@
+{
+  "engine": "claude-step",
+  "mode": "stub",
+  "provider": "anthropic",
+  "model": "claude-stub",
+  "step_id": "report",
+  "flow_key": "deploy",
+  "run_id": "run-20251209-102043-n7mtao",
+  "agent_key": "gh-reporter",
+  "started_at": "2025-12-09T10:20:43.252075+00:00Z",
+  "completed_at": "2025-12-09T10:20:43.252119+00:00Z",
+  "duration_ms": 0,
+  "status": "succeeded",
+  "tokens": {
+    "prompt": 0,
+    "completion": 0,
+    "total": 0
+  },
+  "transcript_path": "llm/report-gh-reporter-claude.jsonl"
+}

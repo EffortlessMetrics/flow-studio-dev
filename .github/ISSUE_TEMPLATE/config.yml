@@ -1,0 +1,14 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/EffortlessMetrics/flow-studio/tree/main/docs
+    about: Check the docs first—most questions are answered there
+  - name: Getting Started Guide
+    url: https://github.com/EffortlessMetrics/flow-studio/blob/main/docs/GETTING_STARTED.md
+    about: New to Flow Studio? Start here
+  - name: Evaluation Checklist
+    url: https://github.com/EffortlessMetrics/flow-studio/blob/main/docs/EVALUATION_CHECKLIST.md
+    about: Evaluating for your team? Use this 1-hour checklist
+  - name: Portable Claude Pack
+    url: https://github.com/EffortlessMetrics/demo-swarm
+    about: Want just the .claude pack for your own repo? Use demo-swarm instead
