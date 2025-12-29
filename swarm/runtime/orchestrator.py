@@ -69,6 +69,18 @@ from .types import (
     handoff_envelope_to_dict,
 )
 
+# Navigator integration for intelligent routing
+from .navigator_integration import (
+    NavigationOrchestrator,
+    NavigationResult,
+    emit_navigation_event,
+    check_and_handle_detour_completion,
+)
+from .router import FlowGraph, Edge, NodeConfig, EdgeCondition
+
+# Maximum nested detour depth (prevents runaway sidequests)
+MAX_DETOUR_DEPTH = 10
+
 # Spec-first imports for FlowSpec routing
 try:
     from swarm.spec.loader import load_flow, load_station
@@ -138,6 +150,15 @@ class GeminiStepOrchestrator:
         self._flow_spec_cache: Dict[str, Any] = {}
         # Cache for loaded StationSpecs (verification)
         self._station_spec_cache: Dict[str, Any] = {}
+
+        # Navigator integration for intelligent routing
+        # Defaults to deterministic fallback if no LLM configured
+        self._navigation_orchestrator = NavigationOrchestrator(
+            repo_root=self._repo_root,
+            navigator=None,  # Uses deterministic fallback
+            sidequest_catalog=None,  # Uses default catalog
+            progress_tracker=None,  # Creates fresh tracker
+        )
 
     def request_stop(self, run_id: RunId) -> bool:
         """Request graceful stop of a running run.
@@ -258,6 +279,84 @@ class GeminiStepOrchestrator:
         except Exception as e:
             logger.warning("Failed to load StationSpec for %s: %s", station_id, e)
             self._station_spec_cache[station_id] = None
+            return None
+
+    def _build_flow_graph(self, flow_key: str) -> Optional[FlowGraph]:
+        """Build a FlowGraph from FlowSpec for Navigator context.
+
+        The Navigator needs a FlowGraph to extract candidate edges and
+        make routing decisions. This method converts FlowSpec step routing
+        into graph edges.
+
+        Args:
+            flow_key: The flow key to build graph for.
+
+        Returns:
+            FlowGraph if spec is available, None otherwise.
+        """
+        flow_spec = self._load_flow_spec(flow_key)
+        if flow_spec is None:
+            return None
+
+        try:
+            nodes: Dict[str, NodeConfig] = {}
+            edges: List[Edge] = []
+
+            for step in flow_spec.steps:
+                # Create node
+                nodes[step.id] = NodeConfig(
+                    node_id=step.id,
+                    template_id=step.station or step.id,
+                    max_iterations=getattr(step.routing, 'max_iterations', None),
+                    exit_on={
+                        "status": list(step.routing.loop_success_values)
+                    } if step.routing.loop_success_values else None,
+                )
+
+                # Create edges from routing
+                routing = step.routing
+                routing_kind = routing.kind.value if hasattr(routing.kind, 'value') else str(routing.kind)
+
+                # Next edge (linear/terminal/branch default)
+                if routing.next:
+                    edges.append(Edge(
+                        edge_id=f"{step.id}->next",
+                        from_node=step.id,
+                        to_node=routing.next,
+                        edge_type="sequence",
+                        priority=50,
+                    ))
+
+                # Loop edge (for microloops)
+                if routing.loop_target:
+                    # Loop edge with exit condition
+                    exit_condition = None
+                    if routing.loop_success_values:
+                        exit_condition = EdgeCondition(
+                            field="status",
+                            operator="not_in",
+                            value=list(routing.loop_success_values),
+                        )
+                    edges.append(Edge(
+                        edge_id=f"{step.id}->loop",
+                        from_node=step.id,
+                        to_node=routing.loop_target,
+                        edge_type="loop",
+                        priority=40,  # Lower priority than advance
+                        condition=exit_condition,
+                    ))
+
+            return FlowGraph(
+                graph_id=flow_key,
+                nodes=nodes,
+                edges=edges,
+                policy={
+                    "max_loop_iterations": 10,  # Default fuse
+                },
+            )
+
+        except Exception as e:
+            logger.debug("Failed to build FlowGraph for %s: %s", flow_key, e)
             return None
 
     def _get_macro_routing(
@@ -783,6 +882,52 @@ class GeminiStepOrchestrator:
                     error_msg = f"Safety limit reached: {total_steps_executed} steps"
                     break
 
+                # =========================================================
+                # DETOUR HANDLING: Check for resume from completed detour
+                # =========================================================
+                # The interruption stack tracks active detours (sidequests).
+                # When a detour completes, we pop the stack and resume.
+                resume_node = check_and_handle_detour_completion(run_state)
+                if resume_node:
+                    # Resume from completed detour - redirect to resume node
+                    logger.info(
+                        "Resuming from completed detour to node: %s",
+                        resume_node,
+                    )
+                    resume_step = self._get_step_by_id(flow_def, resume_node)
+                    if resume_step:
+                        current_step = resume_step
+                        # Emit resume event
+                        storage_module.append_event(
+                            run_id,
+                            RunEvent(
+                                run_id=run_id,
+                                ts=datetime.now(timezone.utc),
+                                kind="detour_resume",
+                                flow_key=flow_key,
+                                step_id=resume_node,
+                                payload={
+                                    "previous_interruption_depth": run_state.get_interruption_depth() + 1,
+                                    "resume_node": resume_node,
+                                },
+                            ),
+                        )
+                    else:
+                        logger.error("Resume node %s not found, continuing normally", resume_node)
+
+                # =========================================================
+                # DETOUR DEPTH CHECK: Prevent infinite nested detours
+                # =========================================================
+                if run_state.get_interruption_depth() >= MAX_DETOUR_DEPTH:
+                    logger.error(
+                        "Maximum detour depth reached (%d), terminating flow",
+                        MAX_DETOUR_DEPTH,
+                    )
+                    final_status = RunStatus.FAILED
+                    sdlc_status = SDLCStatus.ERROR
+                    error_msg = f"Maximum detour depth exceeded: {MAX_DETOUR_DEPTH}"
+                    break
+
                 # Build routing context for microloop metadata
                 routing_ctx = self._build_routing_context(current_step, loop_state)
 
@@ -913,16 +1058,107 @@ class GeminiStepOrchestrator:
                     logger.info("Reached end_step %s, stopping execution", end_step)
                     break
 
-                # Route to next step using RoutingSignal from handoff envelope
-                next_step_id, route_reason = self._route(
-                    flow_def=flow_def,
-                    current_step=current_step,
-                    result=step_result,
-                    loop_state=loop_state,
-                    run_id=run_id,
-                    flow_key=flow_key,
-                    handoff_envelope=handoff_envelope,
-                )
+                # =========================================================
+                # NAVIGATOR INTEGRATION: Intelligent routing with sidequest support
+                # =========================================================
+                # The Navigator provides:
+                # 1. Intelligent routing decisions (deterministic fallback if no LLM)
+                # 2. NextStepBrief for the next worker
+                # 3. Stall detection and sidequest injection
+                # 4. Map gap detection (EXTEND_GRAPH)
+                #
+                # Priority: Navigator > Orchestrator fallback
+                # =========================================================
+
+                flow_graph = self._build_flow_graph(flow_key)
+                use_navigator = flow_graph is not None
+
+                if use_navigator:
+                    # Build file changes from step result if available
+                    file_changes = step_result.get("file_changes")
+
+                    # Get previous envelope for context
+                    previous_envelope = None
+                    if len(step_history) > 1:
+                        prev_step_result = step_history[-2]  # -1 is current
+                        prev_step_id = prev_step_result.get("step_id")
+                        if prev_step_id and prev_step_id in run_state.handoff_envelopes:
+                            previous_envelope = run_state.handoff_envelopes[prev_step_id]
+
+                    # Calculate iteration count for this step
+                    routing = current_step.routing
+                    iteration = 1
+                    if routing and routing.loop_target:
+                        loop_key = f"{current_step.id}:{routing.loop_target}"
+                        iteration = loop_state.get(loop_key, 0) + 1
+
+                    # Build context digest
+                    context_digest = f"step:{current_step.id},status:{step_result.get('status', 'unknown')}"
+
+                    try:
+                        # Navigate using NavigationOrchestrator
+                        nav_result = self._navigation_orchestrator.navigate(
+                            run_id=run_id,
+                            flow_key=flow_key,
+                            current_node=current_step.id,
+                            iteration=iteration,
+                            flow_graph=flow_graph,
+                            step_result=step_result,
+                            verification_result=verification_result if station_id else None,
+                            file_changes=file_changes,
+                            run_state=run_state,
+                            context_digest=context_digest,
+                            previous_envelope=previous_envelope,
+                        )
+
+                        # Use Navigator's routing
+                        next_step_id = nav_result.next_node
+                        route_reason = nav_result.routing_signal.reason or "via_navigator"
+
+                        # Emit navigation event for audit
+                        emit_navigation_event(
+                            run_id=run_id,
+                            flow_key=flow_key,
+                            step_id=current_step.id,
+                            nav_output=nav_result.nav_output,
+                        )
+
+                        # Log detour if injected
+                        if nav_result.detour_injected:
+                            logger.info(
+                                "Navigator injected detour to %s",
+                                next_step_id,
+                            )
+
+                        # Update handoff envelope with Navigator's routing signal
+                        handoff_envelope.routing_signal = nav_result.routing_signal
+
+                    except Exception as e:
+                        logger.warning(
+                            "Navigator failed for step %s, falling back to orchestrator routing: %s",
+                            current_step.id, e,
+                        )
+                        # Fall back to existing orchestrator routing
+                        next_step_id, route_reason = self._route(
+                            flow_def=flow_def,
+                            current_step=current_step,
+                            result=step_result,
+                            loop_state=loop_state,
+                            run_id=run_id,
+                            flow_key=flow_key,
+                            handoff_envelope=handoff_envelope,
+                        )
+                else:
+                    # No FlowGraph available, use existing routing
+                    next_step_id, route_reason = self._route(
+                        flow_def=flow_def,
+                        current_step=current_step,
+                        result=step_result,
+                        loop_state=loop_state,
+                        run_id=run_id,
+                        flow_key=flow_key,
+                        handoff_envelope=handoff_envelope,
+                    )
 
                 # Update routing context with decision and update receipt
                 if routing_ctx:

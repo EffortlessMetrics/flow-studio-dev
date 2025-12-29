@@ -62,11 +62,12 @@ logger = logging.getLogger(__name__)
 
 class RouteIntent(str, Enum):
     """Navigator's routing intent."""
-    ADVANCE = "advance"      # Proceed to next node
-    LOOP = "loop"            # Continue iteration (microloop)
-    DETOUR = "detour"        # Inject sidequest before continuing
-    PAUSE = "pause"          # Request human intervention
-    TERMINATE = "terminate"  # Flow complete
+    ADVANCE = "advance"        # Proceed to next node
+    LOOP = "loop"              # Continue iteration (microloop)
+    DETOUR = "detour"          # Inject sidequest before continuing
+    PAUSE = "pause"            # Request human intervention
+    TERMINATE = "terminate"    # Flow complete
+    EXTEND_GRAPH = "extend_graph"  # Propose edge not in graph (map gap)
 
 
 class SignalLevel(str, Enum):
@@ -130,6 +131,34 @@ class StallSignals:
     last_change_signature: str = ""
     same_failure_signature: bool = False  # Same test failure repeated
     no_file_changes: bool = False
+
+
+@dataclass
+class ProposedEdge:
+    """Proposed edge for EXTEND_GRAPH intent.
+
+    When Navigator encounters a map gap (needs a transition not in the graph),
+    it proposes an edge via this structure. The Kernel validates the target
+    and injects the edge into the run's graph view.
+
+    This is different from DETOUR:
+    - DETOUR: Target is a known sidequest from the catalog
+    - EXTEND_GRAPH: Target is any valid station/template not in current edges
+
+    Attributes:
+        from_node: Source node (current position).
+        to_node: Target station/template ID (must be validated).
+        why: Reasoning for why this edge should exist.
+        edge_type: Type of edge (default: "injection").
+        priority: Priority for the injected edge.
+        is_return: Whether execution should return after this node.
+    """
+    from_node: str
+    to_node: str
+    why: str
+    edge_type: str = "injection"
+    priority: int = 70
+    is_return: bool = True  # Default: return after executing
 
 
 @dataclass
@@ -217,6 +246,7 @@ class NavigatorOutput:
     next_step_brief: NextStepBrief
     signals: NavigatorSignals = field(default_factory=NavigatorSignals)
     detour_request: Optional[DetourRequest] = None
+    proposed_edge: Optional[ProposedEdge] = None  # For EXTEND_GRAPH intent
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Audit trail (not sent to next worker)
@@ -763,6 +793,16 @@ def navigator_output_to_dict(output: NavigatorOutput) -> Dict[str, Any]:
             "resume_at": output.detour_request.resume_at,
         }
 
+    if output.proposed_edge:
+        result["proposed_edge"] = {
+            "from_node": output.proposed_edge.from_node,
+            "to_node": output.proposed_edge.to_node,
+            "why": output.proposed_edge.why,
+            "edge_type": output.proposed_edge.edge_type,
+            "priority": output.proposed_edge.priority,
+            "is_return": output.proposed_edge.is_return,
+        }
+
     if output.elimination_log:
         result["elimination_log"] = output.elimination_log
 
@@ -809,11 +849,24 @@ def navigator_output_from_dict(data: Dict[str, Any]) -> NavigatorOutput:
             resume_at=dr.get("resume_at"),
         )
 
+    proposed_edge = None
+    if "proposed_edge" in data and data["proposed_edge"]:
+        pe = data["proposed_edge"]
+        proposed_edge = ProposedEdge(
+            from_node=pe.get("from_node", ""),
+            to_node=pe.get("to_node", ""),
+            why=pe.get("why", ""),
+            edge_type=pe.get("edge_type", "injection"),
+            priority=pe.get("priority", 70),
+            is_return=pe.get("is_return", True),
+        )
+
     return NavigatorOutput(
         route=route,
         next_step_brief=brief,
         signals=signals,
         detour_request=detour_request,
+        proposed_edge=proposed_edge,
         elimination_log=data.get("elimination_log", []),
         factors_considered=data.get("factors_considered", []),
     )

@@ -60,26 +60,154 @@ class TriggerCondition:
 
 
 @dataclass
+class SidequestStep:
+    """A single step in a multi-step sidequest mini-flow.
+
+    Multi-step sidequests allow complex investigations like:
+    - context-loader -> architecture-critic -> plan-writer
+    - env-doctor -> test-runner -> fixer
+
+    Attributes:
+        template_id: Station/template to execute for this step.
+        step_id: Unique ID for this step (auto-generated if not provided).
+        objective_override: Override station's default objective.
+        params: Additional parameters for this step.
+        inputs_from: Where to get inputs (["previous", "origin"]).
+        outputs_to: Artifact names to produce.
+        on_verified: What to do if step is VERIFIED ("next", "skip_to:X", "halt", "resume").
+        on_unverified: What to do if step is UNVERIFIED (default: continue).
+        on_blocked: What to do if step is BLOCKED (default: halt).
+        max_turns: Maximum turns for this step.
+        model_tier: Model tier override ("haiku", "sonnet", "opus").
+    """
+    template_id: str
+    step_id: Optional[str] = None
+    objective_override: Optional[str] = None
+    params: Dict[str, Any] = field(default_factory=dict)
+    inputs_from: List[str] = field(default_factory=list)
+    outputs_to: List[str] = field(default_factory=list)
+    on_verified: str = "next"
+    on_unverified: str = "next"
+    on_blocked: str = "halt"
+    max_turns: Optional[int] = None
+    model_tier: Optional[str] = None
+
+
+@dataclass
+class ReturnBehavior:
+    """Specifies how to return after sidequest completes.
+
+    Modes:
+    - resume: Return to where we were interrupted
+    - bounce_to: Go to a specific node
+    - advance: Go to next node after original
+    - halt: Stop the flow
+    - conditional: Evaluate condition to decide
+
+    Attributes:
+        mode: Return mode.
+        target_node: Target node for bounce_to mode.
+        condition: CEL expression for conditional mode.
+        on_condition_true: Target if condition is true.
+        on_condition_false: Target if condition is false.
+        pass_artifacts: Artifacts to forward to resume point.
+    """
+    mode: str = "resume"
+    target_node: Optional[str] = None
+    condition: Optional[str] = None
+    on_condition_true: Optional[str] = None
+    on_condition_false: Optional[str] = None
+    pass_artifacts: List[str] = field(default_factory=list)
+
+
+@dataclass
 class SidequestDefinition:
-    """Definition of a sidequest in the catalog.
+    """Definition of a sidequest in the catalog (v2: multi-step support).
 
     Sidequests are pre-defined detour patterns. When triggered, they:
     1. Push current state to interruption stack
-    2. Execute the sidequest station
+    2. Execute the sidequest steps (1 or more)
     3. Resume from where we left off
+
+    Multi-step sidequests allow complex investigations like:
+    - context-loader -> architecture-critic -> plan-writer
+    - env-doctor -> test-runner -> fixer
+
+    For backwards compatibility, single-station sidequests still work.
     """
     sidequest_id: str
     name: str
     description: str
-    station_id: str  # Station to execute for this sidequest
-    objective_template: str  # Template with {{placeholders}} for objective
+
+    # Multi-step support (v2)
+    steps: List[SidequestStep] = field(default_factory=list)
+
+    # Single-station support (v1, backwards compatible)
+    station_id: Optional[str] = None  # Station to execute for this sidequest
+    objective_template: Optional[str] = None  # Template with {{placeholders}}
+
+    # Trigger conditions
     triggers: List[TriggerCondition] = field(default_factory=list)
     trigger_mode: str = "any"  # any (OR) or all (AND)
+
+    # Execution policy
     priority: int = 50  # Higher = more likely to be selected
     cost_hint: str = "low"  # low, medium, high (relative LLM cost)
     max_uses_per_run: int = 3  # Prevent infinite sidequest loops
-    return_behavior: str = "resume"  # resume (continue where we were) or advance
+
+    # Return behavior (enhanced for v2)
+    return_behavior: ReturnBehavior = field(
+        default_factory=lambda: ReturnBehavior(mode="resume")
+    )
+
+    # Metadata
     tags: List[str] = field(default_factory=list)
+
+    # Flow-level settings (v2)
+    max_duration_seconds: Optional[int] = None
+    allow_nested_sidequests: bool = False
+
+    @property
+    def is_multi_step(self) -> bool:
+        """Check if this is a multi-step sidequest.
+
+        A sidequest is multi-step if:
+        - It has multiple steps defined, OR
+        - It has steps defined and no legacy station_id
+        """
+        return len(self.steps) > 1 or (len(self.steps) == 1 and self.station_id is None)
+
+    def to_steps(self) -> List[SidequestStep]:
+        """Get steps, converting legacy single-station format if needed.
+
+        For backwards compatibility, if only station_id is set,
+        we convert it to a single-step list.
+
+        Returns:
+            List of SidequestStep objects.
+        """
+        if self.steps:
+            return self.steps
+        elif self.station_id:
+            # Backwards compatibility: convert to single-step
+            return [SidequestStep(
+                template_id=self.station_id,
+                objective_override=self.objective_template,
+            )]
+        return []
+
+    def get_station_id(self) -> Optional[str]:
+        """Get the primary station ID (first step's template_id).
+
+        For single-station sidequests, returns station_id.
+        For multi-step, returns first step's template_id.
+        """
+        if self.station_id:
+            return self.station_id
+        steps = self.to_steps()
+        if steps:
+            return steps[0].template_id
+        return None
 
 
 # =============================================================================
@@ -272,6 +400,90 @@ def evaluate_trigger(
 
 
 # =============================================================================
+# Parsing Helpers
+# =============================================================================
+
+
+def _parse_return_behavior(data: Any) -> ReturnBehavior:
+    """Parse return behavior from string or dict.
+
+    Supports both v1 (string) and v2 (dict) formats.
+    """
+    if isinstance(data, ReturnBehavior):
+        return data
+    if isinstance(data, str):
+        # v1 format: simple string
+        return ReturnBehavior(mode=data)
+    if isinstance(data, dict):
+        # v2 format: full dict
+        return ReturnBehavior(
+            mode=data.get("mode", "resume"),
+            target_node=data.get("target_node"),
+            condition=data.get("condition"),
+            on_condition_true=data.get("on_condition_true"),
+            on_condition_false=data.get("on_condition_false"),
+            pass_artifacts=data.get("pass_artifacts", []),
+        )
+    return ReturnBehavior(mode="resume")
+
+
+def _parse_sidequest_step(data: Dict[str, Any]) -> SidequestStep:
+    """Parse a SidequestStep from dict format."""
+    return SidequestStep(
+        template_id=data["template_id"],
+        step_id=data.get("step_id"),
+        objective_override=data.get("objective_override"),
+        params=data.get("params", {}),
+        inputs_from=data.get("inputs_from", []),
+        outputs_to=data.get("outputs_to", []),
+        on_verified=data.get("on_verified", "next"),
+        on_unverified=data.get("on_unverified", "next"),
+        on_blocked=data.get("on_blocked", "halt"),
+        max_turns=data.get("max_turns"),
+        model_tier=data.get("model_tier"),
+    )
+
+
+def parse_sidequest_definition(sq_data: Dict[str, Any]) -> SidequestDefinition:
+    """Parse a SidequestDefinition from dict format.
+
+    Supports both v1 (single station) and v2 (multi-step) formats.
+    """
+    # Parse triggers
+    triggers = [
+        TriggerCondition(**t) for t in sq_data.get("triggers", [])
+    ]
+
+    # Parse steps if present (v2 format)
+    steps = []
+    if "steps" in sq_data:
+        steps = [_parse_sidequest_step(s) for s in sq_data["steps"]]
+
+    # Parse return behavior
+    return_behavior = _parse_return_behavior(
+        sq_data.get("return_behavior", "resume")
+    )
+
+    return SidequestDefinition(
+        sidequest_id=sq_data["sidequest_id"],
+        name=sq_data["name"],
+        description=sq_data["description"],
+        steps=steps,
+        station_id=sq_data.get("station_id"),
+        objective_template=sq_data.get("objective_template"),
+        triggers=triggers,
+        trigger_mode=sq_data.get("trigger_mode", "any"),
+        priority=sq_data.get("priority", 50),
+        cost_hint=sq_data.get("cost_hint", "low"),
+        max_uses_per_run=sq_data.get("max_uses_per_run", 3),
+        return_behavior=return_behavior,
+        tags=sq_data.get("tags", []),
+        max_duration_seconds=sq_data.get("max_duration_seconds"),
+        allow_nested_sidequests=sq_data.get("allow_nested_sidequests", False),
+    )
+
+
+# =============================================================================
 # Sidequest Catalog
 # =============================================================================
 
@@ -301,23 +513,7 @@ class SidequestCatalog:
     def _load_defaults(self) -> None:
         """Load default sidequests."""
         for sq_data in DEFAULT_SIDEQUESTS:
-            triggers = [
-                TriggerCondition(**t) for t in sq_data.get("triggers", [])
-            ]
-            sq = SidequestDefinition(
-                sidequest_id=sq_data["sidequest_id"],
-                name=sq_data["name"],
-                description=sq_data["description"],
-                station_id=sq_data["station_id"],
-                objective_template=sq_data["objective_template"],
-                triggers=triggers,
-                trigger_mode=sq_data.get("trigger_mode", "any"),
-                priority=sq_data.get("priority", 50),
-                cost_hint=sq_data.get("cost_hint", "low"),
-                max_uses_per_run=sq_data.get("max_uses_per_run", 3),
-                return_behavior=sq_data.get("return_behavior", "resume"),
-                tags=sq_data.get("tags", []),
-            )
+            sq = parse_sidequest_definition(sq_data)
             self._sidequests[sq.sidequest_id] = sq
 
     def get_all(self) -> List[SidequestDefinition]:
@@ -433,23 +629,7 @@ def load_catalog_from_file(path: Path) -> SidequestCatalog:
 
         sidequests = []
         for sq_data in data.get("sidequests", []):
-            triggers = [
-                TriggerCondition(**t) for t in sq_data.get("triggers", [])
-            ]
-            sq = SidequestDefinition(
-                sidequest_id=sq_data["sidequest_id"],
-                name=sq_data["name"],
-                description=sq_data["description"],
-                station_id=sq_data["station_id"],
-                objective_template=sq_data["objective_template"],
-                triggers=triggers,
-                trigger_mode=sq_data.get("trigger_mode", "any"),
-                priority=sq_data.get("priority", 50),
-                cost_hint=sq_data.get("cost_hint", "low"),
-                max_uses_per_run=sq_data.get("max_uses_per_run", 3),
-                return_behavior=sq_data.get("return_behavior", "resume"),
-                tags=sq_data.get("tags", []),
-            )
+            sq = parse_sidequest_definition(sq_data)
             sidequests.append(sq)
 
         return SidequestCatalog(sidequests)
@@ -470,17 +650,25 @@ def sidequests_to_navigator_options(
     """Convert sidequests to Navigator-compatible options.
 
     This is used to provide the Navigator with a bounded menu of
-    sidequest options.
+    sidequest options. For multi-step sidequests, uses the first step's
+    template as the station_template.
     """
     from .navigator import SidequestOption
 
     options = []
     for sq in sidequests:
+        # Get the primary station ID (first step for multi-step)
+        station_id = sq.get_station_id()
+        # Get objective template from first step if multi-step
+        objective = sq.objective_template
+        if sq.is_multi_step and sq.steps:
+            objective = sq.steps[0].objective_override or objective
+
         options.append(SidequestOption(
             sidequest_id=sq.sidequest_id,
-            station_template=sq.station_id,
+            station_template=station_id,
             trigger_description=sq.description,
-            objective_template=sq.objective_template,
+            objective_template=objective,
             priority=sq.priority,
             cost_hint=sq.cost_hint,
         ))

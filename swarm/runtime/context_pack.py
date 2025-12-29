@@ -12,6 +12,7 @@ Usage:
         build_context_pack,
         resolve_upstream_artifacts,
         load_previous_envelopes,
+        load_navigator_brief,
     )
 
     # Build a complete context pack for a step
@@ -20,6 +21,7 @@ Usage:
     # Or use individual functions for specific needs
     artifacts = resolve_upstream_artifacts(run_base, flow_key, step_id)
     envelopes = load_previous_envelopes(run_base, flow_key)
+    brief = load_navigator_brief(run_base, step_id)
 """
 
 from __future__ import annotations
@@ -32,6 +34,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from swarm.config.flow_registry import TeachingNotes, get_flow_steps
 from swarm.runtime.types import HandoffEnvelope, RunState, handoff_envelope_from_dict
+from swarm.runtime.navigator import NextStepBrief
 
 if TYPE_CHECKING:
     from swarm.runtime.engines import StepContext
@@ -62,6 +65,9 @@ class ContextPack:
         teaching_notes: Optional teaching metadata for scoped context.
         flow_spec_prompt: Optional flow specification prompt text.
         agent_persona: Optional agent persona/role description.
+        navigator_brief: Optional NextStepBrief from Navigator.
+            Contains the objective, focus areas, and warnings for this step
+            as determined by Navigator when routing TO this step.
     """
 
     run_id: str
@@ -72,6 +78,7 @@ class ContextPack:
     teaching_notes: Optional[TeachingNotes] = None
     flow_spec_prompt: Optional[str] = None
     agent_persona: Optional[str] = None
+    navigator_brief: Optional[NextStepBrief] = None
 
     def has_artifacts(self) -> bool:
         """Check if any upstream artifacts are available.
@@ -114,6 +121,26 @@ class ContextPack:
                 return envelope
         return None
 
+    def has_brief(self) -> bool:
+        """Check if a Navigator brief is available for this step.
+
+        Returns:
+            True if a NextStepBrief was loaded for this step.
+        """
+        return self.navigator_brief is not None
+
+    def get_brief(self) -> Optional[NextStepBrief]:
+        """Get the Navigator brief for this step.
+
+        The brief contains the objective, focus areas, context pointers,
+        warnings, and constraints that Navigator determined when routing
+        to this step.
+
+        Returns:
+            The NextStepBrief if available, None otherwise.
+        """
+        return self.navigator_brief
+
 
 def build_context_pack(
     ctx: "StepContext",
@@ -126,6 +153,7 @@ def build_context_pack(
     1. Resolving upstream artifacts based on teaching_notes.inputs
     2. Loading previous handoff envelopes from disk or run_state
     3. Extracting teaching notes from the step context
+    4. Loading Navigator brief for this step (if available)
 
     Args:
         ctx: The StepContext containing step execution metadata.
@@ -143,6 +171,8 @@ def build_context_pack(
         >>> pack = build_context_pack(ctx)
         >>> if pack.has_artifacts():
         ...     adr_path = pack.get_artifact_path("adr.md")
+        >>> if pack.has_brief():
+        ...     print(f"Focus: {pack.get_brief().objective}")
     """
     effective_repo_root = repo_root or ctx.repo_root
     run_base = ctx.run_base
@@ -184,6 +214,18 @@ def build_context_pack(
             ctx.step_id,
         )
 
+    # Load Navigator brief for this step (if available)
+    # Navigator stores the brief when routing TO this step, so we load
+    # the brief with the current step_id
+    navigator_brief = load_navigator_brief(run_base, ctx.step_id)
+    if navigator_brief:
+        logger.debug(
+            "Loaded navigator brief for step %s: %d focus areas, %d warnings",
+            ctx.step_id,
+            len(navigator_brief.focus_areas),
+            len(navigator_brief.warnings),
+        )
+
     return ContextPack(
         run_id=ctx.run_id,
         flow_key=ctx.flow_key,
@@ -193,6 +235,7 @@ def build_context_pack(
         teaching_notes=ctx.teaching_notes,
         flow_spec_prompt=None,  # Reserved for future flow spec loading
         agent_persona=None,  # Reserved for future agent persona loading
+        navigator_brief=navigator_brief,
     )
 
 
@@ -447,6 +490,81 @@ def load_previous_envelopes(run_base: Path, flow_key: str) -> List[HandoffEnvelo
     envelopes.sort(key=lambda env: step_order.get(env.step_id, 999))
 
     return envelopes
+
+
+# Directory name for navigator briefs
+NAV_DIR = "nav"
+
+
+def load_navigator_brief(
+    run_base: Path,
+    step_id: str,
+) -> Optional[NextStepBrief]:
+    """Load Navigator brief for a step from disk.
+
+    Navigator stores briefs when routing TO a step. This function loads
+    the brief for the current step, giving the worker context about what
+    Navigator wants it to focus on.
+
+    Brief location: RUN_BASE/<flow>/nav/<step_id>-brief.json
+
+    Args:
+        run_base: The RUN_BASE path for the flow
+            (e.g., swarm/runs/<run-id>/<flow-key>).
+        step_id: The step ID to load the brief for.
+
+    Returns:
+        NextStepBrief if found, None otherwise.
+
+    Example:
+        >>> brief = load_navigator_brief(
+        ...     run_base=Path("swarm/runs/abc/build"),
+        ...     step_id="implement",
+        ... )
+        >>> if brief:
+        ...     print(f"Objective: {brief.objective}")
+    """
+    nav_dir = run_base / NAV_DIR
+    brief_file = nav_dir / f"{step_id}-brief.json"
+
+    if not brief_file.exists():
+        logger.debug("Navigator brief not found: %s", brief_file)
+        return None
+
+    try:
+        with open(brief_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        brief = NextStepBrief(
+            objective=data.get("objective", ""),
+            focus_areas=data.get("focus_areas", []),
+            context_pointers=data.get("context_pointers", []),
+            warnings=data.get("warnings", []),
+            constraints=data.get("constraints", []),
+        )
+
+        logger.debug(
+            "Loaded navigator brief for step %s: objective=%s",
+            step_id,
+            brief.objective[:50] + "..." if len(brief.objective) > 50 else brief.objective,
+        )
+
+        return brief
+
+    except json.JSONDecodeError as e:
+        logger.warning(
+            "Failed to parse navigator brief JSON in %s: %s",
+            brief_file,
+            e,
+        )
+        return None
+    except Exception as e:
+        logger.warning(
+            "Failed to load navigator brief from %s: %s",
+            brief_file,
+            e,
+        )
+        return None
 
 
 def _get_step_order(flow_key: str) -> Dict[str, int]:

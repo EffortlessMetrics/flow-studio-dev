@@ -1170,7 +1170,7 @@ class StepRouter:
         elimination_log.extend(exit_eliminations)
 
         # Step 3: Apply CEL/condition evaluation
-        candidates, cel_eliminations = self.filter_conditions(candidates, context)
+        candidates, cel_eliminations = self.filter_conditions(candidates, context, current_node)
         elimination_log.extend(cel_eliminations)
 
         # Step 4: Decision logic
@@ -1302,12 +1302,14 @@ class StepRouter:
         self,
         candidates: List[Edge],
         context: RunContext,
+        current_node: str,
     ) -> Tuple[List[Edge], List[Dict[str, Any]]]:
         """Apply CEL/condition evaluation to filter candidates.
 
         Args:
             candidates: List of candidate edges.
             context: Routing context.
+            current_node: The current node ID (for iteration count lookup).
 
         Returns:
             Tuple of (remaining_candidates, elimination_log).
@@ -1319,7 +1321,7 @@ class StepRouter:
         eval_context = {
             "status": context.get("status", ""),
             "can_further_iteration_help": context.get("can_further_iteration_help", True),
-            "iteration_count": context.iteration_counts.get(context.flow_key, 0),
+            "iteration_count": context.iteration_counts.get(current_node, 0),
             "run_id": context.run_id,
             "flow_key": context.flow_key,
             **context.step_output,
