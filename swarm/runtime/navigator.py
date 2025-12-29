@@ -134,6 +134,31 @@ class StallSignals:
 
 
 @dataclass
+class ProposedNode:
+    """Proposed node for EXTEND_GRAPH intent.
+
+    Specifies WHAT to run when Navigator proposes a map gap.
+    Separate from ProposedEdge which specifies HOW to connect it.
+
+    Attributes:
+        node_id: Optional explicit node ID (auto-generated if not provided).
+        template_id: Station/template to execute (required if station_id not set).
+        station_id: Station to execute (required if template_id not set).
+        objective: Specific objective for this node execution.
+        params: Additional parameters for execution.
+    """
+    template_id: Optional[str] = None
+    station_id: Optional[str] = None
+    node_id: Optional[str] = None
+    objective: str = ""
+    params: Dict[str, Any] = field(default_factory=dict)
+
+    def get_target_id(self) -> Optional[str]:
+        """Get the target station/template ID."""
+        return self.station_id or self.template_id
+
+
+@dataclass
 class ProposedEdge:
     """Proposed edge for EXTEND_GRAPH intent.
 
@@ -152,6 +177,7 @@ class ProposedEdge:
         edge_type: Type of edge (default: "injection").
         priority: Priority for the injected edge.
         is_return: Whether execution should return after this node.
+        proposed_node: Optional ProposedNode with execution details.
     """
     from_node: str
     to_node: str
@@ -159,6 +185,7 @@ class ProposedEdge:
     edge_type: str = "injection"
     priority: int = 70
     is_return: bool = True  # Default: return after executing
+    proposed_node: Optional[ProposedNode] = None
 
 
 @dataclass
@@ -794,7 +821,7 @@ def navigator_output_to_dict(output: NavigatorOutput) -> Dict[str, Any]:
         }
 
     if output.proposed_edge:
-        result["proposed_edge"] = {
+        pe_dict = {
             "from_node": output.proposed_edge.from_node,
             "to_node": output.proposed_edge.to_node,
             "why": output.proposed_edge.why,
@@ -802,6 +829,15 @@ def navigator_output_to_dict(output: NavigatorOutput) -> Dict[str, Any]:
             "priority": output.proposed_edge.priority,
             "is_return": output.proposed_edge.is_return,
         }
+        if output.proposed_edge.proposed_node:
+            pe_dict["proposed_node"] = {
+                "template_id": output.proposed_edge.proposed_node.template_id,
+                "station_id": output.proposed_edge.proposed_node.station_id,
+                "node_id": output.proposed_edge.proposed_node.node_id,
+                "objective": output.proposed_edge.proposed_node.objective,
+                "params": output.proposed_edge.proposed_node.params,
+            }
+        result["proposed_edge"] = pe_dict
 
     if output.elimination_log:
         result["elimination_log"] = output.elimination_log
@@ -852,6 +888,16 @@ def navigator_output_from_dict(data: Dict[str, Any]) -> NavigatorOutput:
     proposed_edge = None
     if "proposed_edge" in data and data["proposed_edge"]:
         pe = data["proposed_edge"]
+        proposed_node = None
+        if "proposed_node" in pe and pe["proposed_node"]:
+            pn = pe["proposed_node"]
+            proposed_node = ProposedNode(
+                template_id=pn.get("template_id"),
+                station_id=pn.get("station_id"),
+                node_id=pn.get("node_id"),
+                objective=pn.get("objective", ""),
+                params=pn.get("params", {}),
+            )
         proposed_edge = ProposedEdge(
             from_node=pe.get("from_node", ""),
             to_node=pe.get("to_node", ""),
@@ -859,6 +905,7 @@ def navigator_output_from_dict(data: Dict[str, Any]) -> NavigatorOutput:
             edge_type=pe.get("edge_type", "injection"),
             priority=pe.get("priority", 70),
             is_return=pe.get("is_return", True),
+            proposed_node=proposed_node,
         )
 
     return NavigatorOutput(

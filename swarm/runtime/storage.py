@@ -21,6 +21,7 @@ Usage:
         write_spec, read_spec,
         write_summary, read_summary, update_summary,
         append_event, read_events,
+        query_navigator_events, summarize_navigator_events,  # For Wisdom analysis
         write_run_state, read_run_state, update_run_state,
         write_envelope, read_envelope, list_envelopes,
         commit_step_completion,
@@ -595,6 +596,121 @@ def read_events(run_id: RunId, runs_dir: Path = RUNS_DIR) -> List[RunEvent]:
         return []
 
     return events
+
+
+# Navigator event types for Wisdom analysis
+NAVIGATOR_EVENT_TYPES = frozenset({
+    "graph_patch_suggested",   # EXTEND_GRAPH - map gap detected
+    "detour_taken",            # Sidequest invoked
+    "navigation_decision",     # Navigator route choice
+    "sidequest_start",         # Sidequest execution started
+    "sidequest_complete",      # Sidequest finished
+    "loop_stall_detected",     # Progress signature unchanged across loops
+})
+
+
+def query_navigator_events(
+    run_id: RunId,
+    event_types: Optional[List[str]] = None,
+    runs_dir: Path = RUNS_DIR,
+) -> List[RunEvent]:
+    """Query Navigator-related events for Wisdom analysis.
+
+    This function filters events to those relevant for learning:
+    - EXTEND_GRAPH (graph_patch_suggested) for Tier 2 flow topology learning
+    - DETOUR (detour_taken, sidequest_*) for Tier 1 tactical learning
+    - LOOP_STALL for stall detection patterns
+
+    Args:
+        run_id: The unique run identifier.
+        event_types: Optional list of specific event types to filter.
+                     If None, returns all navigator event types.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        List of RunEvent objects matching the criteria.
+    """
+    all_events = read_events(run_id, runs_dir)
+
+    filter_types = set(event_types) if event_types else NAVIGATOR_EVENT_TYPES
+
+    return [e for e in all_events if e.event_type in filter_types]
+
+
+def summarize_navigator_events(
+    run_id: RunId,
+    runs_dir: Path = RUNS_DIR,
+) -> Dict[str, Any]:
+    """Summarize Navigator events for Wisdom process analysis.
+
+    Returns a structured summary suitable for process-analyst to consume.
+
+    Args:
+        run_id: The unique run identifier.
+        runs_dir: Base directory for runs. Defaults to RUNS_DIR.
+
+    Returns:
+        Dictionary with counts and details for Wisdom analysis:
+        - map_gaps: List of EXTEND_GRAPH events with target info
+        - detours: List of sidequests invoked with frequency
+        - stalls: List of stall detection events
+        - tier_summary: Preliminary tier classification
+    """
+    events = query_navigator_events(run_id, runs_dir=runs_dir)
+
+    # Initialize summary
+    summary: Dict[str, Any] = {
+        "map_gaps": [],
+        "detours": [],
+        "stalls": [],
+        "tier_summary": {
+            "tier1_candidates": 0,
+            "tier2_candidates": 0,
+            "tier3_candidates": 0,
+        },
+    }
+
+    # Track sidequest frequency
+    sidequest_counts: Dict[str, int] = {}
+
+    for event in events:
+        payload = event.payload or {}
+
+        if event.event_type == "graph_patch_suggested":
+            summary["map_gaps"].append({
+                "flow_key": event.flow_key,
+                "step_id": event.step_id,
+                "from_node": payload.get("from_node"),
+                "to_node": payload.get("to_node"),
+                "reason": payload.get("reason"),
+                "patch": payload.get("patch"),
+            })
+
+        elif event.event_type in ("detour_taken", "sidequest_start"):
+            sidequest_id = payload.get("sidequest_id", "unknown")
+            sidequest_counts[sidequest_id] = sidequest_counts.get(sidequest_id, 0) + 1
+
+        elif event.event_type == "loop_stall_detected":
+            summary["stalls"].append({
+                "flow_key": event.flow_key,
+                "step_id": event.step_id,
+                "consecutive_loops": payload.get("consecutive_loops"),
+                "progress_signature": payload.get("progress_signature"),
+            })
+
+    # Build detour summary with frequency
+    for sidequest_id, count in sidequest_counts.items():
+        summary["detours"].append({
+            "sidequest_id": sidequest_id,
+            "invocation_count": count,
+        })
+
+    # Preliminary tier classification
+    # Tier 2: 3+ occurrences of same map gap pattern
+    summary["tier_summary"]["tier2_candidates"] = len(summary["map_gaps"])
+    summary["tier_summary"]["tier1_candidates"] = len(summary["detours"])
+
+    return summary
 
 
 # -----------------------------------------------------------------------------

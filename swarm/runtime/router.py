@@ -167,7 +167,8 @@ class RouteContext:
         run_id: The current run identifier.
         flow_key: The flow being executed.
         iteration_counts: Map of node_id to iteration count for microloop tracking.
-        max_iterations_default: Default max iterations if not specified per-node.
+        max_iterations_default: Safety fuse (not steering) - default if not specified per-node.
+            Actual loop exit should be driven by stall detection and critic judgment.
         previous_outputs: Map of step_id to their outputs for context.
         annotations: Arbitrary context annotations.
     """
@@ -175,7 +176,7 @@ class RouteContext:
     run_id: str
     flow_key: str
     iteration_counts: Dict[str, int] = field(default_factory=dict)
-    max_iterations_default: int = 5
+    max_iterations_default: int = 50  # Safety fuse, use stall detection for steering
     previous_outputs: Dict[str, StepOutput] = field(default_factory=dict)
     annotations: Dict[str, Any] = field(default_factory=dict)
 
@@ -1050,7 +1051,7 @@ class RunContext:
         flow_key: The flow being executed.
         step_output: Output from the current step.
         iteration_counts: Map of node_id to iteration count for microloop tracking.
-        max_iterations: Default maximum iterations for microloops.
+        max_iterations: Safety fuse for microloops (not steering - use stall detection).
         annotations: Additional context data.
     """
 
@@ -1058,7 +1059,7 @@ class RunContext:
     flow_key: str
     step_output: Dict[str, Any]
     iteration_counts: Dict[str, int] = field(default_factory=dict)
-    max_iterations: int = 5
+    max_iterations: int = 50  # Safety fuse, use stall detection for steering
     annotations: Dict[str, Any] = field(default_factory=dict)
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -1603,7 +1604,7 @@ class RoutingContext:
         flow_key: The flow being executed.
         current_node: The current node/step ID.
         iteration_counts: Map of node_id to iteration count for microloop tracking.
-        max_iterations: Default maximum iterations for microloops.
+        max_iterations: Safety fuse for microloops (not steering - use stall detection).
         annotations: Additional context data (e.g., from previous steps).
     """
 
@@ -1611,7 +1612,7 @@ class RoutingContext:
     flow_key: str
     current_node: str
     iteration_counts: Dict[str, int] = field(default_factory=dict)
-    max_iterations: int = 5
+    max_iterations: int = 50  # Safety fuse, use stall detection for steering
     annotations: Dict[str, Any] = field(default_factory=dict)
 
 

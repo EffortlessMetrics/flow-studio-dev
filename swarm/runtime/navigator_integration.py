@@ -53,6 +53,8 @@ from .navigator import (
     FileChangesSummary,
     StallSignals,
     ProgressTracker,
+    ProposedEdge,
+    ProposedNode,
     extract_candidate_edges_from_graph,
     navigator_output_to_dict,
 )
@@ -349,11 +351,16 @@ def apply_detour_request(
 
 def check_and_handle_detour_completion(
     run_state: RunState,
+    sidequest_catalog: Optional[SidequestCatalog] = None,
 ) -> Optional[str]:
     """Check if we should resume from a completed detour.
 
     If the interruption stack has frames and the current detour is
-    complete, pop and return the resume node.
+    complete, pop and return the resume node based on ReturnBehavior.
+
+    Args:
+        run_state: Current run state with interruption/resume stacks.
+        sidequest_catalog: Optional catalog to look up return behavior.
 
     Returns:
         Resume node ID, or None if no resume needed.
@@ -361,21 +368,219 @@ def check_and_handle_detour_completion(
     if not run_state.is_interrupted():
         return None
 
-    # Check if current sidequest is complete (marked in completed_nodes)
+    # Check if current sidequest is complete
     top_frame = run_state.peek_interruption()
     if top_frame is None:
         return None
 
-    # For now, assume we resume after one step
-    # More sophisticated: check if sidequest produced expected outputs
+    # Get sidequest context from frame
+    context_snapshot = top_frame.context_snapshot or {}
+    sidequest_id = context_snapshot.get("sidequest_id")
+    current_step_index = context_snapshot.get("current_step_index", 0)
+
+    # Check if multi-step sidequest has more steps
+    if sidequest_catalog and sidequest_id:
+        sidequest = sidequest_catalog.get_by_id(sidequest_id)
+        if sidequest and sidequest.is_multi_step:
+            steps = sidequest.to_steps()
+            if current_step_index < len(steps) - 1:
+                # More steps remain - advance to next step
+                next_step_index = current_step_index + 1
+                next_step = steps[next_step_index]
+
+                # Update context with new step index
+                context_snapshot["current_step_index"] = next_step_index
+                # Note: We'd need to update the frame, but stacks are immutable
+                # For now, log and return the next step's template
+                logger.info(
+                    "Multi-step sidequest %s advancing to step %d: %s",
+                    sidequest_id, next_step_index, next_step.template_id,
+                )
+                return next_step.template_id
+
+    # Sidequest is complete - apply return behavior
     resume_point = run_state.pop_resume()
     run_state.pop_interruption()
 
+    # Determine return node based on return_behavior
+    if sidequest_catalog and sidequest_id:
+        sidequest = sidequest_catalog.get_by_id(sidequest_id)
+        if sidequest:
+            return_behavior = sidequest.return_behavior
+
+            if return_behavior.mode == "bounce_to" and return_behavior.target_node:
+                logger.info(
+                    "Sidequest %s bouncing to: %s",
+                    sidequest_id, return_behavior.target_node,
+                )
+                return return_behavior.target_node
+
+            elif return_behavior.mode == "halt":
+                logger.info("Sidequest %s halting flow", sidequest_id)
+                return None
+
+            elif return_behavior.mode == "conditional" and return_behavior.condition:
+                # TODO: Evaluate CEL condition against current context
+                # For now, fall back to resume
+                logger.debug("Conditional return not yet implemented, resuming")
+
+    # Default: resume mode
     if resume_point:
         logger.info("Resuming from detour to node: %s", resume_point.node_id)
         return resume_point.node_id
 
     return top_frame.return_node
+
+
+def apply_extend_graph_request(
+    nav_output: NavigatorOutput,
+    run_state: RunState,
+    current_node: str,
+    station_library: Optional[List[str]] = None,
+) -> Optional[str]:
+    """Apply an EXTEND_GRAPH request from Navigator.
+
+    When Navigator encounters a map gap (needs a transition not in the graph),
+    this function:
+    1. Validates the target exists in the station/template library
+    2. Creates a run-local injected node
+    3. Pushes resume point
+    4. Returns the station to execute
+
+    Args:
+        nav_output: Navigator output with proposed_edge.
+        run_state: RunState to modify.
+        current_node: Current node (for resume point).
+        station_library: Optional list of valid station/template IDs.
+
+    Returns:
+        Station/template ID to execute, or None if request is invalid.
+    """
+    if nav_output.proposed_edge is None:
+        return None
+
+    proposed = nav_output.proposed_edge
+    target_id = proposed.to_node
+
+    # If proposed_node has explicit target, use that
+    if proposed.proposed_node:
+        explicit_target = proposed.proposed_node.get_target_id()
+        if explicit_target:
+            target_id = explicit_target
+
+    if not target_id:
+        logger.warning("EXTEND_GRAPH request has no target")
+        return None
+
+    # Validate target exists in library (if library provided)
+    if station_library and target_id not in station_library:
+        logger.warning(
+            "EXTEND_GRAPH target %s not in station library, rejecting",
+            target_id,
+        )
+        return None
+
+    # Generate injected node ID
+    injected_node_id = f"inj-{target_id}-{run_state.step_index}"
+
+    # Push resume point if this is a return edge
+    if proposed.is_return:
+        run_state.push_resume(current_node, {
+            "extend_graph_reason": proposed.why,
+            "injected_node_id": injected_node_id,
+        })
+
+        # Push interruption frame for map gap
+        run_state.push_interruption(
+            reason=f"Map gap: {proposed.why}",
+            return_node=current_node,
+            context_snapshot={
+                "injected_node_id": injected_node_id,
+                "proposed_edge": {
+                    "from_node": proposed.from_node,
+                    "to_node": target_id,
+                    "edge_type": proposed.edge_type,
+                    "priority": proposed.priority,
+                },
+                "objective": proposed.proposed_node.objective if proposed.proposed_node else "",
+            },
+        )
+
+    # Add to injected nodes
+    run_state.add_injected_node(injected_node_id)
+
+    logger.info(
+        "EXTEND_GRAPH: Injected node %s (target=%s, resume=%s)",
+        injected_node_id, target_id, proposed.is_return,
+    )
+
+    return target_id
+
+
+def emit_graph_patch_suggested_event(
+    run_id: str,
+    flow_key: str,
+    step_id: str,
+    proposed_edge: ProposedEdge,
+    append_event_fn: Optional[Callable] = None,
+) -> None:
+    """Emit a graph_patch_suggested event for UI patch workflow.
+
+    When Navigator proposes a map gap via EXTEND_GRAPH, this event
+    allows the UI to show the suggestion and optionally apply it
+    to the flow spec.
+
+    Args:
+        run_id: Run identifier.
+        flow_key: Flow key.
+        step_id: Step that triggered the suggestion.
+        proposed_edge: The proposed edge/node.
+        append_event_fn: Function to append events (for testing).
+    """
+    if append_event_fn is None:
+        from . import storage as storage_module
+        append_event_fn = storage_module.append_event
+
+    patch_payload = {
+        "op": "add",
+        "path": f"/edges/-",
+        "value": {
+            "edge_id": f"suggested-{proposed_edge.from_node}-{proposed_edge.to_node}",
+            "from": proposed_edge.from_node,
+            "to": proposed_edge.to_node,
+            "type": proposed_edge.edge_type,
+            "priority": proposed_edge.priority,
+        },
+    }
+
+    if proposed_edge.proposed_node:
+        # Also suggest adding the node
+        node_patch = {
+            "op": "add",
+            "path": f"/nodes/-",
+            "value": {
+                "node_id": proposed_edge.proposed_node.node_id or f"suggested-{proposed_edge.to_node}",
+                "template_id": proposed_edge.proposed_node.template_id or proposed_edge.to_node,
+                "station_id": proposed_edge.proposed_node.station_id,
+            },
+        }
+        patch_payload = [node_patch, patch_payload]
+
+    event = RunEvent(
+        run_id=run_id,
+        ts=datetime.now(timezone.utc),
+        kind="graph_patch_suggested",
+        flow_key=flow_key,
+        step_id=step_id,
+        payload={
+            "reason": proposed_edge.why,
+            "patch": patch_payload,
+            "is_return": proposed_edge.is_return,
+            "injected_for_run": True,
+        },
+    )
+
+    append_event_fn(run_id, event)
 
 
 # =============================================================================
@@ -464,6 +669,7 @@ class NavigationResult:
     brief_stored: bool
     detour_injected: bool
     nav_output: NavigatorOutput
+    extend_graph_injected: bool = False
 
 
 class NavigationOrchestrator:
@@ -545,7 +751,7 @@ class NavigationOrchestrator:
             NavigationResult with routing decision and artifacts.
         """
         # Check if resuming from a completed detour
-        resume_node = check_and_handle_detour_completion(run_state)
+        resume_node = check_and_handle_detour_completion(run_state, self._sidequest_catalog)
         if resume_node:
             # Return resume routing
             return NavigationResult(
@@ -597,6 +803,9 @@ class NavigationOrchestrator:
         # Apply detour if requested
         detour_station = None
         detour_injected = False
+        extend_graph_target = None
+        extend_graph_injected = False
+
         if nav_output.route.intent == RouteIntent.DETOUR and nav_output.detour_request:
             detour_station = apply_detour_request(
                 nav_output=nav_output,
@@ -608,6 +817,27 @@ class NavigationOrchestrator:
                 detour_injected = True
                 # Override next node to be the detour station
                 nav_output.route.target_node = detour_station
+
+        elif nav_output.route.intent == RouteIntent.EXTEND_GRAPH and nav_output.proposed_edge:
+            # Handle map gap - Navigator is proposing an edge not in the graph
+            extend_graph_target = apply_extend_graph_request(
+                nav_output=nav_output,
+                run_state=run_state,
+                current_node=current_node,
+                station_library=None,  # TODO: Pass station library for validation
+            )
+            if extend_graph_target:
+                extend_graph_injected = True
+                # Override next node to be the injected target
+                nav_output.route.target_node = extend_graph_target
+
+                # Emit graph_patch_suggested event for UI
+                emit_graph_patch_suggested_event(
+                    run_id=run_id,
+                    flow_key=flow_key,
+                    step_id=current_node,
+                    proposed_edge=nav_output.proposed_edge,
+                )
 
         # Convert to routing signal
         routing_signal = navigator_to_routing_signal(nav_output)
@@ -637,7 +867,13 @@ class NavigationOrchestrator:
             brief_stored=brief_stored,
             detour_injected=detour_injected,
             nav_output=nav_output,
+            extend_graph_injected=extend_graph_injected,
         )
+
+    @property
+    def sidequest_catalog(self) -> SidequestCatalog:
+        """Get the sidequest catalog for external use."""
+        return self._sidequest_catalog
 
     def reset(self, run_id: Optional[str] = None) -> None:
         """Reset state for a new run.

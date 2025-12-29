@@ -44,6 +44,30 @@ Supporting:
 
 ## Analysis Dimensions
 
+### 0. Runtime Adaptation Analysis (Navigator Events)
+
+**Why this matters:** The Navigator discovers "map gaps" at runtime when it must deviate from the canonical flow graph. These adaptations are learning opportunities—they reveal where the flow specs are incomplete or where the codebase has unique needs.
+
+**Event sources:**
+- `events.jsonl` under `.runs/<run-id>/`
+- Query for `event_type` in: `graph_patch_suggested`, `detour_taken`, `navigation_decision`, `sidequest_start`, `sidequest_complete`
+
+**What to look for:**
+- **EXTEND_GRAPH events**: Navigator requested a node/edge not in the flow spec
+  - This is a "map gap"—the spec didn't anticipate this need
+  - Pattern once = anomaly; pattern 3+ times = deficiency
+- **DETOUR events**: Navigator invoked a sidequest from the catalog
+  - Expected behavior, but frequency matters
+  - Which sidequests fire most often?
+- **Navigation decisions**: Why did Navigator choose its route?
+  - Look for `"route_intent": "LOOP"` vs `"ADVANCE"` decisions
+  - Repeated LOOPs without progress signature change = stall
+
+**Tier classification for learnings:**
+- **Tier 1 (Tactical)**: One-off workarounds → Scent Trail only
+- **Tier 2 (Strategic)**: Repeated EXTEND_GRAPH → Propose flow spec patch
+- **Tier 3 (Skill)**: Repeated station failures → Propose station tuning
+
 ### 1. Flow Progression
 
 **What to look for:**
@@ -112,6 +136,27 @@ Supporting:
 
 ## Behavior
 
+### Step 0: Query Navigator Events (if events.jsonl exists)
+
+If `.runs/<run-id>/events.jsonl` exists, extract navigation events:
+
+```bash
+# Extract Navigator events (grep + jq or manual parsing)
+# Look for event_type in: graph_patch_suggested, detour_taken, navigation_decision, sidequest_start, sidequest_complete
+
+# Example: count EXTEND_GRAPH events
+grep '"event_type":"graph_patch_suggested"' .runs/<run-id>/events.jsonl | wc -l
+
+# Example: list sidequest names invoked
+grep '"event_type":"sidequest_start"' .runs/<run-id>/events.jsonl | jq -r '.sidequest_id' | sort | uniq -c
+```
+
+Build a Navigator event summary:
+- Total EXTEND_GRAPH (map gaps)
+- Total detours taken
+- Sidequest frequency by name
+- Navigation LOOPs without progress (stall indicators)
+
 ### Step 1: Load Timeline Data
 
 Read `flow_history.json` and receipts to build a timeline of events:
@@ -119,6 +164,7 @@ Read `flow_history.json` and receipts to build a timeline of events:
 - AC completions
 - Commit timestamps
 - Gate decisions
+- Navigator route decisions (if available)
 
 ### Step 2: Calculate Metrics
 
@@ -172,6 +218,10 @@ Write `.runs/<run-id>/wisdom/process_analysis.md`:
 | Stall count | <int> |
 | Human checkpoints | <int> |
 | Efficiency score | HIGH / MEDIUM / LOW |
+| **Navigator Adaptation** | |
+| Map gaps (EXTEND_GRAPH) | <int> |
+| Detours taken | <int> |
+| Sidequests invoked | <int> |
 
 ## Executive Summary
 
@@ -284,6 +334,51 @@ No Gate bounces in this run.
 - **Changes:** None
 - **Assessment:** STABLE
 
+## Navigator Adaptation Analysis
+
+*This section captures where the Navigator had to deviate from the canonical flow graph.*
+
+### Map Gaps (EXTEND_GRAPH Events)
+
+| # | Flow | From Node | To Node | Reason | Tier |
+|---|------|-----------|---------|--------|------|
+| 1 | Build | Implement | SecurityScanner | "PII detected in input" | 2 (structural) |
+| 2 | Plan | Design | ContractCheck | "Missing API contract" | 2 (structural) |
+
+**Pattern Analysis:**
+- If a node/edge was injected 3+ times across runs → **Tier 2 (flow spec needs update)**
+- If it was a one-off adaptation → **Tier 1 (scent trail only)**
+
+### Detours Taken (Sidequests)
+
+| Sidequest | Invocations | Trigger | Return Behavior |
+|-----------|-------------|---------|-----------------|
+| env-triage | 2 | CI failure signature | resume |
+| test-failure-triage | 1 | Test failure | resume |
+| security-audit | 0 | (not triggered) | — |
+
+**Observations:**
+- High `env-triage` frequency may indicate flaky CI or environment issues
+- Repeated `test-failure-triage` may indicate weak test isolation
+
+### Stall Detection (Navigation LOOPs)
+
+| Flow | Node | Consecutive LOOPs | Progress Signature Changed? | Outcome |
+|------|------|-------------------|-----------------------------|---------|
+| Build | CodeImpl | 3 | No | Navigator escalated to detour |
+
+**Interpretation:**
+- LOOP without progress change = stall (Navigator detecting "spinning")
+- Navigator should either: change tack, detour, or pause for human
+
+### Learning Tier Summary
+
+| Tier | Count | Action |
+|------|-------|--------|
+| Tier 1 (Tactical) | 2 | → Scent trail update |
+| Tier 2 (Strategic) | 1 | → Flow spec patch suggested |
+| Tier 3 (Skill) | 0 | → Station tuning (none needed) |
+
 ## Efficiency Score: MEDIUM
 
 **Rationale:**
@@ -317,6 +412,13 @@ No Gate bounces in this run.
 - PROC_SPINNING_ACS: <count>
 - PROC_HUMAN_CHECKPOINTS: <count>
 - PROC_FLOWS_RERUN: <count>
+- NAV_MAP_GAPS: <count>
+- NAV_DETOURS: <count>
+- NAV_SIDEQUESTS: <count>
+- NAV_STALL_LOOPS: <count>
+- TIER1_LEARNINGS: <count>
+- TIER2_LEARNINGS: <count>
+- TIER3_LEARNINGS: <count>
 ```
 
 ## Handoff Guidelines

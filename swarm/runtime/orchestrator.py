@@ -887,7 +887,10 @@ class GeminiStepOrchestrator:
                 # =========================================================
                 # The interruption stack tracks active detours (sidequests).
                 # When a detour completes, we pop the stack and resume.
-                resume_node = check_and_handle_detour_completion(run_state)
+                resume_node = check_and_handle_detour_completion(
+                    run_state,
+                    self._navigation_orchestrator.sidequest_catalog,
+                )
                 if resume_node:
                     # Resume from completed detour - redirect to resume node
                     logger.info(

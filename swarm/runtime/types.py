@@ -166,10 +166,20 @@ class CELEvaluation:
 
 @dataclass
 class MicroloopContext:
-    """Context for microloop routing decisions."""
+    """Context for microloop routing decisions.
+
+    Note: max_iterations is a safety fuse, not a steering mechanism.
+    Actual loop exit should be driven by:
+    1. VERIFIED status from critic
+    2. Stall detection via ProgressTracker (same failure signature repeating)
+    3. can_further_iteration_help == False from critic
+
+    The high default (50) ensures loops don't terminate prematurely
+    while the fuse prevents infinite loops.
+    """
 
     iteration: int = 1
-    max_iterations: int = 3
+    max_iterations: int = 50  # Safety fuse, not steering - use stall detection
     loop_target: str = ""
     exit_status: str = ""
     can_further_iteration_help: bool = True

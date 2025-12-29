@@ -33,12 +33,17 @@ From `.runs/<run-id>/wisdom/`:
 - `learnings.md`
 - `regression_report.md`
 - `artifact_audit.md`
+- `process_analysis.md` ← **NEW: Contains Navigator adaptation analysis (Tier 1/2/3 learnings)**
 
 From `.runs/<run-id>/build/` (hardening worklists; optional):
 - `mutation_report.md`
 - `fuzz_report.md`
 - `flakiness_report.md`
 - `doc_critique.md`
+
+From `.runs/<run-id>/events.jsonl` (Navigator events; optional):
+- `graph_patch_suggested` events → Tier 2 flow spec patches
+- `tool_telemetry` events → Tier 3 station tuning
 
 Missing inputs ⇒ **UNVERIFIED**, not mechanical failure, unless you cannot write the output file.
 
@@ -50,12 +55,16 @@ Missing inputs ⇒ **UNVERIFIED**, not mechanical failure, unless you cannot wri
 |--------|----------|---------|
 | `feedback_actions.md` | Project (Both) | Issue drafts, doc suggestions, follow-up work items |
 | `pack_improvements.md` | Pack (Machine) | Ready-to-apply diffs for agent prompts, flow docs, skills |
+| `flow_evolution.patch` | Pack (Tier 2) | JSON Patches for flow specs (from EXTEND_GRAPH patterns) |
+| `station_tuning.md` | Pack (Tier 3) | Station config updates (from tool telemetry patterns) |
 | `codebase_wisdom.md` | Repo (Human) | Structural hotspots, brittle patterns, architectural observations |
 | `.runs/_wisdom/latest.md` | Future (Scent Trail) | Top 3-5 learnings for the next run's researcher |
 
 **Files to write:**
 - `.runs/<run-id>/wisdom/feedback_actions.md` — issue drafts and minor suggestions
 - `.runs/<run-id>/wisdom/pack_improvements.md` — ready-to-apply diffs for pack/agent prompts
+- `.runs/<run-id>/wisdom/flow_evolution.patch` — JSON Patches for flow spec evolution (Tier 2)
+- `.runs/<run-id>/wisdom/station_tuning.md` — station config updates (Tier 3)
 - `.runs/<run-id>/wisdom/codebase_wisdom.md` — structural insights for humans
 - `.runs/_wisdom/latest.md` — scent trail for future runs (cross-run persistence)
 
@@ -84,6 +93,22 @@ Missing inputs ⇒ **UNVERIFIED**, not mechanical failure, unless you cannot wri
 - Flow 3 (Build): test gaps, mutation survivors, fuzz crashes, flakiness, coverage holes, brittle patterns.
 - **Pack/Flow improvements**: agent prompt gaps, missing automation, friction points, cross-cutting concerns (from `PACK_OBS` markers in learnings.md).
 - Cross-cutting: pack-check / marker contract / receipt schema improvements (only if evidenced).
+
+2b) **Analyze Navigator learnings (from process_analysis.md):**
+
+**Tier 1 (Tactical Memory):**
+- One-off workarounds, environment-specific quirks
+- Action: Add to scent trail (`.runs/_wisdom/latest.md`)
+
+**Tier 2 (Strategic/Flow Topology):**
+- Repeated EXTEND_GRAPH patterns (3+ occurrences across runs)
+- Action: Generate `flow_evolution.patch` with JSON Patch operations
+- Example: If Navigator kept injecting "SecurityScanner" after "Implement" → add that edge permanently
+
+**Tier 3 (Skill/Station Tuning):**
+- Repeated station failures from tool_telemetry
+- Action: Generate `station_tuning.md` with config updates
+- Example: If "CodeImplementer" repeatedly fails Rust tests → update station with `rust-analyzer` tool or better system prompt
 
 3) Create **issue drafts** (not real issues):
 - Prefer issue drafts for concrete, testable work.
@@ -199,6 +224,125 @@ None. (Drafts only; no GitHub side effects.)
 **Recommendation:** <specific next step with reasoning>
 ```
 
+## Output Format: `flow_evolution.patch` (Tier 2 — Flow Topology)
+
+This file contains JSON Patch operations to evolve the flow specs based on repeated EXTEND_GRAPH patterns.
+
+```json
+{
+  "schema_version": "flow_evolution_v1",
+  "run_id": "<run-id>",
+  "generated_at": "<ISO8601>",
+  "patches": [
+    {
+      "id": "FLOW-PATCH-001",
+      "target_flow": "swarm/spec/flows/3-build.yaml",
+      "reason": "Navigator injected SecurityScanner after Implement 3+ times",
+      "evidence": [
+        "run-001/events.jsonl:graph_patch_suggested:42",
+        "run-002/events.jsonl:graph_patch_suggested:67",
+        "run-003/events.jsonl:graph_patch_suggested:23"
+      ],
+      "operations": [
+        {
+          "op": "add",
+          "path": "/steps/-",
+          "value": {
+            "id": "security_scan",
+            "station": "security-scanner",
+            "objective": "Scan for PII and security issues in changed files",
+            "routing": { "kind": "linear", "next": "commit" }
+          }
+        },
+        {
+          "op": "replace",
+          "path": "/steps/4/routing/next",
+          "value": "security_scan"
+        }
+      ],
+      "risk": "low",
+      "human_review_required": true
+    }
+  ],
+  "summary": {
+    "total_patches": 1,
+    "tier2_learnings_applied": 1
+  }
+}
+```
+
+**When to generate:**
+- Only when `process_analysis.md` shows `TIER2_LEARNINGS: N` where N > 0
+- Only when the same EXTEND_GRAPH pattern appears 3+ times across runs
+- If no Tier 2 learnings, write an empty patches array
+
+**Human workflow:**
+1. Human reviews `flow_evolution.patch`
+2. If approved, apply via: `jq '.patches[0].operations' flow_evolution.patch | jsonpatch swarm/spec/flows/3-build.yaml`
+3. Or: UI shows "Apply Suggested Evolution" button
+
+## Output Format: `station_tuning.md` (Tier 3 — Skill Acquisition)
+
+This file contains station configuration updates based on repeated tool failures.
+
+```md
+# Station Tuning Suggestions (Run <run-id>)
+
+## Station: code-implementer
+
+**Pattern observed:** Repeated Rust test failures (5 occurrences)
+**Evidence:**
+- run-001: tool_telemetry shows `cargo test` failed 3 times before success
+- run-002: tool_telemetry shows `cargo test` failed 4 times, never succeeded
+- run-003: tool_telemetry shows `cargo test` failed 2 times before success
+
+**Root cause hypothesis:** Station lacks Rust-specific tooling context
+
+**Proposed tuning:**
+
+File: `swarm/spec/stations/code-implementer.yaml`
+```diff
+  tools:
+    - Read
+    - Write
+    - Bash
++   - rust-analyzer
+  system_prompt_append: |
+    When writing Rust code:
+-   - Run `cargo check` before tests
++   - Run `cargo check --all-targets` before tests
++   - Use `cargo test --no-fail-fast` to see all failures
++   - Check for common Rust patterns: ownership, lifetimes, trait bounds
+```
+
+**Risk:** Low — adds tooling hints, doesn't change behavior
+**Human review required:** Yes
+
+---
+
+## Station: test-author
+
+**Pattern observed:** (none detected)
+
+---
+
+## Summary
+
+| Station | Tuning Needed | Risk |
+|---------|---------------|------|
+| code-implementer | Yes | Low |
+| test-author | No | — |
+
+## Inventory
+- STATION_TUNING: code-implementer risk=low
+- TIER3_LEARNINGS: 1
+```
+
+**When to generate:**
+- Only when tool_telemetry shows repeated failures for specific stations
+- Look for patterns like: same station fails 3+ times with similar error signatures
+- If no Tier 3 learnings, write "No station tuning needed" summary
+
 ## Output Format: `codebase_wisdom.md` (required)
 
 ```md
@@ -283,9 +427,12 @@ For mechanical counting, preserve these exact line prefixes:
 - Issue drafts: `^- ISSUE: `
 - Suggestions: `^- \[ \] `
 - Pack improvements: `^### PACK-`
+- Flow patches: `^- FLOW_PATCH: ` (Tier 2)
+- Station tunings: `^- STATION_TUNING: ` (Tier 3)
 - Inventory issue lines: `^- ISSUE_DRAFT: `
 - Inventory suggestion lines: `^- SUGGESTION: `
 - Inventory pack improvement lines: `^- PACK_IMPROVEMENT: `
+- Tier counts: `^- TIER[123]_LEARNINGS: `
 
 Do not vary these prefixes.
 
@@ -308,6 +455,8 @@ When you're done, tell the orchestrator what happened in natural language:
 - How many issue drafts created
 - How many suggestions produced
 - How many pack improvements (diffs)
+- How many flow evolution patches (Tier 2)
+- How many station tunings (Tier 3)
 - Which input files were present vs missing
 - Whether scent trail was updated
 
