@@ -432,6 +432,42 @@ If you need to update the validator itself (`swarm/tools/validate_swarm.py`):
 4. Update this file and `CLAUDE.md` to document new requirements
 5. Increment version in validator docstring if FR requirements change
 
+## Repository Structure
+
+Flow Studio uses a two-repo workflow:
+
+| Repo | Purpose | URL |
+|------|---------|-----|
+| **flow-studio** | Main repo, production-ready code | `EffortlessMetrics/flow-studio` |
+| **flow-studio-swarm** | Development fork for larger features | `EffortlessMetrics/flow-studio-swarm` |
+
+### Workflow
+
+1. **Small changes**: Work directly on `flow-studio` feature branches
+2. **Large features**: Develop in `flow-studio-swarm`, then PR back to `flow-studio`
+3. **After merge**: Both repos are synced to identical `main` branches
+
+### Historical Development Tags
+
+When large features are merged from `flow-studio-swarm` to `flow-studio`, the detailed commit history is preserved as tags:
+
+```bash
+# View available history tags
+git tag -l '*-dev-history'
+
+# Browse detailed commits for a release
+git log v3.0-dev-history --oneline
+
+# See full context for a specific change
+git show v3.0-dev-history
+```
+
+| Tag | Contents |
+|-----|----------|
+| `v3.0-dev-history` | 22 commits: Navigator, governance rules, Flow 8, runtime infrastructure |
+
+This preserves archaeology (why decisions were made) while keeping `main` clean for future work.
+
 ## Questions?
 
 - **Design questions:** See `swarm/positioning.md` (philosophy) and `ARCHITECTURE.md` (structure)
