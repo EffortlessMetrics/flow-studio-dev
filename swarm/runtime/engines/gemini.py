@@ -446,7 +446,8 @@ class GeminiStepEngine(StepEngine):
 
         # Track tool calls for normalized receipts
         tool_calls: List[NormalizedToolCall] = []
-        pending_tool_use: Optional[Dict[str, Any]] = None
+        # Track pending tool_use events by ID to handle interleaved tool calls
+        pending_tool_calls: Dict[str, Dict[str, Any]] = {}
 
         if process.stdout:
             for line in process.stdout:
@@ -471,17 +472,30 @@ class GeminiStepEngine(StepEngine):
 
                     # Track tool calls for normalized receipts
                     if event_type == "tool_use":
-                        # Store pending tool_use to match with result
-                        pending_tool_use = event_data
+                        # Track by tool_use_id to handle multiple outstanding calls
+                        tool_use_id = (
+                            event_data.get("id")
+                            or event_data.get("tool_use_id")
+                            or f"tool_{len(pending_tool_calls)}"
+                        )
+                        pending_tool_calls[tool_use_id] = event_data
                     elif event_type == "tool_result":
-                        # Create normalized tool call from pending use + result
-                        if pending_tool_use is not None:
+                        # Match result to its corresponding tool_use by ID
+                        tool_use_id = event_data.get("tool_use_id") or event_data.get("id")
+                        if tool_use_id and tool_use_id in pending_tool_calls:
                             tool_call = from_gemini_events(
-                                pending_tool_use,
+                                pending_tool_calls.pop(tool_use_id),
                                 event_data,
                             )
                             tool_calls.append(tool_call)
-                            pending_tool_use = None
+                        elif pending_tool_calls:
+                            # Fallback: if no ID match, use oldest pending (FIFO)
+                            oldest_id = next(iter(pending_tool_calls))
+                            tool_call = from_gemini_events(
+                                pending_tool_calls.pop(oldest_id),
+                                event_data,
+                            )
+                            tool_calls.append(tool_call)
                         else:
                             # tool_result without matching tool_use
                             # Create a tool call with just the result info
@@ -527,6 +541,15 @@ class GeminiStepEngine(StepEngine):
                             payload={"message": line},
                         )
                     )
+
+        # Drain orphan tool_use events that never received a tool_result.
+        # This can happen if a tool call was interrupted, errored, or timed out.
+        # These incomplete calls should still appear in receipts for debugging.
+        for tool_use_id, tool_use_event in pending_tool_calls.items():
+            tool_call = from_gemini_events(tool_use_event, None)
+            # Mark as incomplete since we never got a result
+            tool_call.success = False
+            tool_calls.append(tool_call)
 
         _, stderr = process.communicate()
         end_time = datetime.now(timezone.utc)

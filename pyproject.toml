@@ -22,6 +22,7 @@ dev = [
     "pytest>=9.0.2",
     "pytest-bdd>=8.1.0",
     "pytest-benchmark>=5.2.3",
+    "claude-agent-sdk>=0.1.19",
 ]
 mcp = [
     "mcp>=1.23.1",
@@ -71,6 +72,7 @@ markers = [
     "integration: CLI, file I/O, subprocess",
     "bdd: BDD scenario (executable spec)",
     "performance: Performance benchmark tests",
+    "contract: Contract tests verifying SDK/transport integration",
 ]
 filterwarnings = [
     # Suppress gherkin library deprecation warnings (maxsplit positional arg)
@@ -84,4 +86,5 @@ filterwarnings = [
 dev = [
     "prometheus-client>=0.23.1",
     "pytest-benchmark>=5.2.3",
+    "claude-agent-sdk>=0.1.19",
 ]

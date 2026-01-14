@@ -58,6 +58,9 @@ help:
 	@echo "  make agent-sdk-ts-demo   # Run TypeScript Agent SDK example"
 	@echo "  make agent-sdk-py-demo   # Run Python Agent SDK example"
 	@echo "  make agent-sdk-help      # Agent SDK documentation"
+	@echo "  make check-agent-sdk     # Verify Claude Agent SDK is installed"
+	@echo "  make vendor-agent-sdk    # Vendor SDK API surface for offline use"
+	@echo "  make vendor-help         # SDK vendoring documentation"
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  make runs-clean          # Clean stale runs from swarm/runs/"
@@ -944,6 +947,7 @@ agent-sdk-help:
 # Runs all validation before selftest (DRY: single place to maintain)
 .PHONY: dev-precheck
 dev-precheck:
+	@$(MAKE) check-agent-sdk
 	@$(MAKE) gen-adapters
 	@$(MAKE) gen-flows
 	@$(MAKE) gen-flow-constants
@@ -954,6 +958,7 @@ dev-precheck:
 	@$(MAKE) check-index-html
 	@$(MAKE) validate-swarm
 	@$(MAKE) check-capabilities-doc
+	@$(MAKE) check-vendor-agent-sdk
 	@$(MAKE) ts-check
 	@$(MAKE) docs-check
 	@echo ""
@@ -1134,3 +1139,57 @@ profiles-help:
 	@echo "  make gen-flow-constants && make gen-adapters && make ts-build"
 	@echo ""
 	@echo "See docs/FLOW_PROFILES.md for full documentation."
+
+# ============================================================================
+# Agent SDK Vendoring
+# ============================================================================
+
+.PHONY: check-agent-sdk
+check-agent-sdk:
+	@uv run --extra dev --group dev python - <<'PY'
+import sys
+try:
+    import claude_agent_sdk  # noqa: F401
+except Exception:
+    print("ERROR: claude-agent-sdk not installed. Run: uv sync --extra dev", file=sys.stderr)
+    sys.exit(1)
+print("OK: claude-agent-sdk installed.")
+PY
+
+.PHONY: vendor-agent-sdk
+vendor-agent-sdk:
+	@echo "Vendoring Claude Agent SDK API surface..."
+	uv run --extra dev --group dev python swarm/tools/vendor_agent_sdk.py --write
+
+.PHONY: check-vendor-agent-sdk
+check-vendor-agent-sdk:
+	@echo "Checking vendored Claude Agent SDK artifacts..."
+	uv run --extra dev --group dev python swarm/tools/vendor_agent_sdk.py --check
+
+.PHONY: vendor-agent-sdk-status
+vendor-agent-sdk-status:
+	@uv run --extra dev --group dev python swarm/tools/vendor_agent_sdk.py --status
+
+.PHONY: vendor-help
+vendor-help:
+	@echo "SDK Vendoring Commands"
+	@echo "======================"
+	@echo ""
+	@echo "  make vendor-agent-sdk         Write/update vendored SDK artifacts"
+	@echo "  make check-vendor-agent-sdk   Verify artifacts match installed SDK"
+	@echo "  make vendor-agent-sdk-status  Show SDK and vendor status"
+	@echo ""
+	@echo "Vendored artifacts (docs/vendor/anthropic/agent-sdk/python/):"
+	@echo "  VERSION.json      - SDK package metadata"
+	@echo "  API_MANIFEST.json - Introspected API surface"
+	@echo "  TOOLS_MANIFEST.json - Tool names from REFERENCE.md"
+	@echo "  REFERENCE.md      - Human-readable SDK reference (optional)"
+	@echo "  MAPPING.json      - Adapter mapping of upstream symbols"
+	@echo ""
+	@echo "Update workflow:"
+	@echo "  1. Update SDK: pip install -U claude-agent-sdk"
+	@echo "  2. Update REFERENCE.md if upstream docs changed"
+	@echo "  3. Run: make vendor-agent-sdk"
+	@echo "  4. Commit the updated artifacts"
+	@echo ""
+	@echo "See docs/reference/AGENT_SDK_VENDORING.md for full documentation."
