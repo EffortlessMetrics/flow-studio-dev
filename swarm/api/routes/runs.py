@@ -5,7 +5,9 @@ This module aggregates route modules for runs, autopilot, and issue ingestion.
 The router is mounted at /runs by the server (prefix is managed externally).
 
 For new development, import directly from the specific route modules:
-- runs_routes: Run CRUD and lifecycle endpoints
+- runs_crud: Run CRUD endpoints (start, list, get)
+- runs_control: Run lifecycle endpoints (pause, resume, inject, interrupt, cancel, stop)
+- runs_stack: Run stack inspection endpoints
 - autopilot_routes: Autopilot start/stop/tick endpoints
 - issue_routes: Issue ingestion endpoints
 
@@ -17,10 +19,12 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-# Import sub-routers
+# Import sub-routers from split modules
 from .autopilot_routes import router as autopilot_router
 from .issue_routes import router as issue_router
-from .runs_routes import router as runs_router
+from .runs_control import router as runs_control_router
+from .runs_crud import router as runs_crud_router
+from .runs_stack import router as runs_stack_router
 
 # Create the main router that aggregates all sub-routers
 # The server mounts this at /api. Prefixes are specified on include_router calls
@@ -31,8 +35,14 @@ router = APIRouter(tags=["runs"])
 # This allows sub-routers to use "" for collection root endpoints (e.g., GET /runs, POST /runs)
 # without hitting the empty-prefix + empty-path FastAPI restriction.
 
-# runs_router handles /runs/* endpoints (CRUD, pause, resume, etc.)
-router.include_router(runs_router, prefix="/runs")
+# runs_crud handles /runs/* core CRUD endpoints (start, list, get)
+router.include_router(runs_crud_router, prefix="/runs")
+
+# runs_control handles /runs/{id}/* control endpoints (pause, resume, inject, etc.)
+router.include_router(runs_control_router, prefix="/runs")
+
+# runs_stack handles /runs/{id}/stack endpoint
+router.include_router(runs_stack_router, prefix="/runs")
 
 # autopilot_router handles /runs/autopilot/* endpoints
 router.include_router(autopilot_router, prefix="/runs/autopilot")
@@ -54,8 +64,8 @@ from ..services.run_state import RunStateManager, get_state_manager
 # For backward compatibility, alias the old private function
 _get_state_manager = get_state_manager
 
-# Re-export Pydantic models from runs_routes
-from .runs_routes import (
+# Re-export Pydantic models from runs_models
+from .runs_models import (
     InjectRequest,
     InterruptionFrameResponse,
     InterruptionStackResponse,
