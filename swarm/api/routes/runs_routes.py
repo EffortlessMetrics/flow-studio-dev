@@ -189,7 +189,7 @@ class InterruptionStackResponse(BaseModel):
 # =============================================================================
 
 
-@router.post("/", response_model=RunStartResponse, status_code=201)
+@router.post("", response_model=RunStartResponse, status_code=201)
 async def start_run(request: RunStartRequest):
     """Start a new run.
 
@@ -232,7 +232,7 @@ async def start_run(request: RunStartRequest):
         )
 
 
-@router.get("/", response_model=RunListResponse)
+@router.get("", response_model=RunListResponse)
 async def list_runs(limit: int = 20):
     """List recent runs.
 

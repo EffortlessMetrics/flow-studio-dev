@@ -112,7 +112,7 @@ def _get_autopilot_controller():
 # =============================================================================
 
 
-@router.post("/", response_model=AutopilotStartResponse, status_code=201)
+@router.post("", response_model=AutopilotStartResponse, status_code=201)
 async def start_autopilot(request: AutopilotStartRequest):
     """Start an autopilot run for end-to-end SDLC execution.
 

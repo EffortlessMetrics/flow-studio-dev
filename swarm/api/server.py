@@ -1383,8 +1383,9 @@ def create_app(
     return app
 
 
-# Create default app instance for uvicorn
-app = create_app()
+# NOTE: Module-level app creation removed to avoid import side effects.
+# For ASGI servers, use: uvicorn swarm.api.asgi:app
+# For programmatic access, use: from swarm.api.asgi import app
 
 
 # =============================================================================
@@ -1405,7 +1406,6 @@ def main():
     parser.add_argument("--no-cors", action="store_true", help="Disable CORS")
     args = parser.parse_args()
 
-    global app
     app = create_app(enable_cors=not args.no_cors)
 
     print(f"Starting Flow Studio API server at http://{args.host}:{args.port}")

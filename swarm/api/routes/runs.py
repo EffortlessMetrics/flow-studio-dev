@@ -23,18 +23,22 @@ from .issue_routes import router as issue_router
 from .runs_routes import router as runs_router
 
 # Create the main router that aggregates all sub-routers
-# The server mounts this at /api, so we need /runs prefix here
-router = APIRouter(prefix="/runs", tags=["runs"])
+# The server mounts this at /api. Prefixes are specified on include_router calls
+# to avoid the "prefix and path cannot be both empty" FastAPI error.
+router = APIRouter(tags=["runs"])
 
-# Include sub-routers
-# runs_router handles base /runs/* endpoints (CRUD, pause, resume, etc.)
-router.include_router(runs_router)
+# Include sub-routers with explicit prefixes
+# This allows sub-routers to use "" for collection root endpoints (e.g., GET /runs, POST /runs)
+# without hitting the empty-prefix + empty-path FastAPI restriction.
+
+# runs_router handles /runs/* endpoints (CRUD, pause, resume, etc.)
+router.include_router(runs_router, prefix="/runs")
 
 # autopilot_router handles /runs/autopilot/* endpoints
-router.include_router(autopilot_router, prefix="/autopilot")
+router.include_router(autopilot_router, prefix="/runs/autopilot")
 
-# issue_router handles /runs/from-issue endpoint (already has the path in the route)
-router.include_router(issue_router)
+# issue_router handles /runs/from-issue endpoint
+router.include_router(issue_router, prefix="/runs")
 
 
 # =============================================================================
