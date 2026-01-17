@@ -654,10 +654,16 @@ _spec_manager: Optional[SpecManager] = None
 
 
 def get_spec_manager() -> SpecManager:
-    """Get the global SpecManager instance."""
-    global _spec_manager
+    """Get the global SpecManager instance.
+
+    Raises:
+        RuntimeError: If set_spec_manager() was never called.
+    """
     if _spec_manager is None:
-        _spec_manager = SpecManager()
+        raise RuntimeError(
+            "SpecManager not initialized. Call set_spec_manager() first, "
+            "or use create_app() which handles initialization."
+        )
     return _spec_manager
 
 
