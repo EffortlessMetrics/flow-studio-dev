@@ -166,6 +166,31 @@ class TestAPIImportSideEffects:
         assert sm._spec_manager is manager
         assert sm.get_spec_manager() is manager
 
+    def test_clear_spec_manager_resets_singleton(self):
+        """clear_spec_manager() should reset the singleton to None."""
+        import swarm.api.services.spec_manager as sm
+        from swarm.api.services.spec_manager import (
+            SpecManager,
+            clear_spec_manager,
+            set_spec_manager,
+        )
+
+        # Set up a manager
+        manager = SpecManager()
+        set_spec_manager(manager)
+        assert sm._spec_manager is manager
+
+        # Clear it
+        clear_spec_manager()
+
+        # Verify it's None
+        assert sm._spec_manager is None
+
+        # get_spec_manager should raise
+        import pytest
+        with pytest.raises(RuntimeError, match="SpecManager not initialized"):
+            sm.get_spec_manager()
+
 
 class TestASGIEntrypoint:
     """Tests for the ASGI entrypoint module."""

@@ -238,3 +238,94 @@ class TestRouteCanonicalSummary:
         # Log the actual routes for visibility
         runs_routes = sorted([p for p in paths if "/runs" in p])
         print(f"\n[INFO] Runs-related routes in OpenAPI: {runs_routes}")
+
+
+class TestOperationIdUniqueness:
+    """Guardrail tests for unique operation IDs in OpenAPI schema."""
+
+    def test_openapi_operation_ids_unique(self, api_app):
+        """
+        All OpenAPI operation IDs must be unique.
+
+        **Background**:
+        FastAPI auto-generates operation IDs from function names. When multiple
+        endpoints share the same function name (e.g., `list_runs` in server.py
+        and in runs_crud.py), this causes duplicate operation ID warnings.
+
+        **Contract**:
+        - Every operation in the OpenAPI schema must have a unique operationId
+        - Duplicates indicate either:
+          1. Duplicate endpoints (same path + method) - serious bug
+          2. Same function name used in multiple route modules - naming issue
+
+        **Fix Options**:
+        - Add explicit `operation_id="unique_name"` to the route decorator
+        - Rename the handler function to be unique
+        - Remove duplicate route definitions
+        """
+        from collections import Counter
+
+        openapi = api_app.openapi()
+        paths = openapi.get("paths", {})
+
+        # Collect all operation IDs
+        operation_ids = []
+        op_id_to_routes = {}  # For debugging: map op_id to its routes
+
+        for path, methods in paths.items():
+            for method, operation in methods.items():
+                if method in ("parameters", "servers"):
+                    continue  # Skip non-method keys
+                op_id = operation.get("operationId")
+                if op_id:
+                    operation_ids.append(op_id)
+                    if op_id not in op_id_to_routes:
+                        op_id_to_routes[op_id] = []
+                    op_id_to_routes[op_id].append(f"{method.upper()} {path}")
+
+        # Find duplicates
+        duplicates = {k: v for k, v in Counter(operation_ids).items() if v > 1}
+
+        if duplicates:
+            # Build detailed error message
+            dup_details = []
+            for op_id, count in duplicates.items():
+                routes = op_id_to_routes.get(op_id, [])
+                dup_details.append(f"  {op_id} ({count} occurrences): {routes}")
+
+            assert False, (
+                f"Duplicate OpenAPI operation IDs found:\n"
+                + "\n".join(dup_details)
+                + "\n\nFix by adding explicit operation_id to route decorators "
+                "or removing duplicate endpoints."
+            )
+
+    def test_no_duplicate_routes(self, api_app):
+        """
+        No duplicate route paths with the same HTTP method.
+
+        **Contract**:
+        - Each (method, path) combination must be unique
+        - Duplicates indicate router composition bugs (e.g., same route registered twice)
+        """
+        from collections import Counter
+        from fastapi.routing import APIRoute
+
+        routes = []
+        for route in api_app.routes:
+            if isinstance(route, APIRoute):
+                # Get methods excluding HEAD and OPTIONS (auto-generated)
+                methods = tuple(
+                    sorted(m for m in route.methods if m not in {"HEAD", "OPTIONS"})
+                )
+                routes.append((methods, route.path))
+
+        duplicates = {k: v for k, v in Counter(routes).items() if v > 1}
+
+        if duplicates:
+            dup_details = [f"  {methods} {path} ({count}x)" for (methods, path), count in duplicates.items()]
+            assert False, (
+                f"Duplicate route registrations found:\n"
+                + "\n".join(dup_details)
+                + "\n\nThis indicates a router composition bug - check include_router calls."
+            )

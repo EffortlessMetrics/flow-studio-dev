@@ -674,3 +674,12 @@ def set_spec_manager(manager: SpecManager) -> None:
     """
     global _spec_manager
     _spec_manager = manager
+
+
+def clear_spec_manager() -> None:
+    """Clear the global SpecManager instance.
+
+    Intended for tests only - allows resetting singleton state between tests.
+    """
+    global _spec_manager
+    _spec_manager = None

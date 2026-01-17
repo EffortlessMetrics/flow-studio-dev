@@ -391,13 +391,13 @@ def create_app(
     # Flow Graph Endpoints
     # -------------------------------------------------------------------------
 
-    @app.get("/api/spec/flows", response_model=FlowListResponse)
+    @app.get("/api/spec/flows", response_model=FlowListResponse, operation_id="legacy_list_flows")
     async def list_flows():
         """List all available flow graphs."""
         flows = get_spec_manager().list_flows()
         return FlowListResponse(flows=[FlowSummary(**f) for f in flows])
 
-    @app.get("/api/spec/flows/{flow_id}")
+    @app.get("/api/spec/flows/{flow_id}", operation_id="legacy_get_flow")
     async def get_flow(
         flow_id: str,
         if_none_match: Optional[str] = Header(None),
@@ -425,7 +425,7 @@ def create_app(
                 },
             )
 
-    @app.patch("/api/spec/flows/{flow_id}")
+    @app.patch("/api/spec/flows/{flow_id}", operation_id="legacy_update_flow")
     async def update_flow(
         flow_id: str,
         patch_ops: List[Dict[str, Any]],
@@ -472,13 +472,13 @@ def create_app(
     # Template Endpoints
     # -------------------------------------------------------------------------
 
-    @app.get("/api/spec/templates", response_model=TemplateListResponse)
+    @app.get("/api/spec/templates", response_model=TemplateListResponse, operation_id="legacy_list_templates")
     async def list_templates():
         """List all available step templates."""
         templates = get_spec_manager().list_templates()
         return TemplateListResponse(templates=[TemplateSummary(**t) for t in templates])
 
-    @app.get("/api/spec/templates/{template_id}")
+    @app.get("/api/spec/templates/{template_id}", operation_id="legacy_get_template")
     async def get_template(
         template_id: str,
         if_none_match: Optional[str] = Header(None),
@@ -510,14 +510,14 @@ def create_app(
     # Validation / Compilation Endpoints
     # -------------------------------------------------------------------------
 
-    @app.post("/api/spec/validate", response_model=ValidationResponse)
+    @app.post("/api/spec/validate", response_model=ValidationResponse, operation_id="legacy_validate_spec")
     async def validate_spec(request: ValidationRequest):
         """Validate a flow spec without saving."""
         data = request.model_dump(exclude_none=True)
         errors = get_spec_manager().validate_flow(data)
         return ValidationResponse(valid=len(errors) == 0, errors=errors)
 
-    @app.post("/api/spec/compile", response_model=CompileResponse)
+    @app.post("/api/spec/compile", response_model=CompileResponse, operation_id="legacy_compile_spec")
     async def compile_spec(request: CompileRequest):
         """Preview PromptPlan compilation."""
         try:
@@ -539,61 +539,10 @@ def create_app(
             )
 
     # -------------------------------------------------------------------------
-    # Run State Endpoints
-    # -------------------------------------------------------------------------
-
-    @app.get("/api/runs", response_model=RunListResponse)
-    async def list_runs(limit: int = 20):
-        """List recent runs."""
-        runs = get_spec_manager().list_runs(limit=limit)
-        return RunListResponse(runs=[RunSummary(**r) for r in runs])
-
-    @app.get("/api/runs/{run_id}/state")
-    async def get_run_state(
-        run_id: str,
-        if_none_match: Optional[str] = Header(None),
-    ):
-        """Get the state of a run."""
-        try:
-            state_data, etag = get_spec_manager().get_run_state(run_id)
-
-            # Check If-None-Match for caching (strip quotes from ETag)
-            if if_none_match and if_none_match.strip('"') == etag:
-                return Response(status_code=304)
-
-            return JSONResponse(
-                content=state_data,
-                headers={"ETag": f'"{etag}"'},
-            )
-
-        except FileNotFoundError:
-            raise HTTPException(
-                status_code=404,
-                detail={
-                    "error": "run_not_found",
-                    "message": f"Run '{run_id}' not found",
-                    "details": {},
-                },
-            )
-
-    @app.get("/api/runs/{run_id}/events")
-    async def stream_run_events(run_id: str):
-        """Stream Server-Sent Events for a run."""
-        return StreamingResponse(
-            get_spec_manager().stream_run_events(run_id),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",
-            },
-        )
-
-    # -------------------------------------------------------------------------
     # Health Check
     # -------------------------------------------------------------------------
 
-    @app.get("/api/health", response_model=HealthResponse)
+    @app.get("/api/health", response_model=HealthResponse, operation_id="api_health_check")
     async def health_check(request: Request):
         """Health check endpoint.
 
@@ -662,7 +611,7 @@ def create_app(
     # RunTailer Endpoints
     # -------------------------------------------------------------------------
 
-    @app.get("/api/tailer/health", response_model=TailerHealthInfo)
+    @app.get("/api/tailer/health", response_model=TailerHealthInfo, operation_id="tailer_health_check")
     async def tailer_health(request: Request):
         """Check RunTailer health.
 
@@ -693,7 +642,7 @@ def create_app(
             error=tailer_state.get("error"),
         )
 
-    @app.post("/api/tailer/ingest/{run_id}", response_model=TailerIngestResponse)
+    @app.post("/api/tailer/ingest/{run_id}", response_model=TailerIngestResponse, operation_id="tailer_trigger_ingest")
     async def trigger_ingest(run_id: str, request: Request):
         """Manually trigger ingestion for a specific run.
 
